@@ -27,13 +27,8 @@ extern "C" {
 #define FNET_CALLBACK_VA(NAME, ...) void (*(NAME))(struct fnet_t *connection, __VA_ARGS__, void *udata)
 
 struct fnet_t {
-  FNET_SOCKET   sock;
   FNET_PROTOCOL proto;
   FNET_STATUS   status;
-  FNET_FLAG     flags;
-  FNET_CALLBACK(onConnect);
-  FNET_CALLBACK_VA(onData, struct buf *data);
-  FNET_CALLBACK(onClose);
   void *udata;
 };
 
@@ -47,7 +42,7 @@ struct fnet_connect_options_t {
 };
 
 struct fnet_t * fnet_listen(const char *address, uint16_t port, struct fnet_connect_options_t *options);
-struct fnet_t * fnet_connect(const char *address, uint16_t port, struct fnet_connect_options_t *options);
+struct fnet_t * fnet_connect(const char *address, struct fnet_connect_options_t *options);
 
 void fnet_process(struct fnet_t *connection);
 void fnet_write(struct fnet_t *connection, struct buf *buf);
