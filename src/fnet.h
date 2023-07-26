@@ -9,13 +9,15 @@ extern "C" {
 
 #include "tidwall/buf.h"
 
-#define FNET_SOCKET int
-
 #define FNET_FLAG            uint8_t
 #define FNET_FLAG_RECONNECT  1
 
 #define FNET_PROTOCOL  uint8_t
 #define FNET_PROTO_TCP 0
+
+#define FNET_RETURNCODE                  int
+#define FNET_RETURNCODE_OK               0
+#define FNET_RETURNCODE_MISSING_ARGUMENT 1
 
 #define FNET_STATUS             uint8_t
 #define FNET_STATUS_CONNECTING  1   // Client-only status
@@ -44,13 +46,13 @@ struct fnet_connect_options_t {
 struct fnet_t * fnet_listen(const char *address, uint16_t port, struct fnet_connect_options_t *options);
 struct fnet_t * fnet_connect(const char *address, uint16_t port, struct fnet_connect_options_t *options);
 
-void fnet_process(struct fnet_t *connection);
-void fnet_write(struct fnet_t *connection, struct buf *buf);
-void fnet_close(struct fnet_t *connection);
-void fnet_free(struct fnet_t *connection);
+FNET_RETURNCODE fnet_process(struct fnet_t *connection);
+FNET_RETURNCODE fnet_write(struct fnet_t *connection, struct buf *buf);
+FNET_RETURNCODE fnet_close(struct fnet_t *connection);
+FNET_RETURNCODE fnet_free(struct fnet_t *connection);
 
-void fnet_step();
-void fnet_main();
+FNET_RETURNCODE fnet_step();
+FNET_RETURNCODE fnet_main();
 
 #ifdef __cplusplus
 }
