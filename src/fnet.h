@@ -49,6 +49,9 @@ void fnet_write(struct fnet_t *connection, struct buf *buf);
 void fnet_close(struct fnet_t *connection);
 void fnet_free(struct fnet_t *connection);
 
+void fnet_step();
+void fnet_main();
+
 #ifdef __cplusplus
 }
 #endif

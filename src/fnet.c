@@ -37,7 +37,7 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, struct fnet_conn
   // Check if we support the protocol
   switch(options->proto) {
     case FNET_PROTO_TCP:
-      // TODO: something
+      // Intentionally empty
       break;
     default:
       fprintf(stderr, "fnet_listen: unknown protocol\n");
@@ -72,6 +72,9 @@ void fnet_process(struct fnet_t *connection) {
   }
 
 }
+
+
+
 void fnet_write(struct fnet_t *connection, struct buf *buf) {
   struct fnet_internal_t *conn = (struct fnet_internal_t *)connection;
 
@@ -108,6 +111,18 @@ void fnet_free(struct fnet_t *connection) {
 
   free(conn);
 }
+
+void fnet_step() {
+  // TODO: process all open fnet instances
+}
+
+void fnet_main() {
+  while(1) {
+    // TODO: handle kill signal?
+    fnet_step();
+  }
+}
+
 
 
 #ifdef __cplusplus
