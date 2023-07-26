@@ -42,7 +42,7 @@ struct fnet_connect_options_t {
 };
 
 struct fnet_t * fnet_listen(const char *address, uint16_t port, struct fnet_connect_options_t *options);
-struct fnet_t * fnet_connect(const char *address, struct fnet_connect_options_t *options);
+struct fnet_t * fnet_connect(const char *address, uint16_t port, struct fnet_connect_options_t *options);
 
 void fnet_process(struct fnet_t *connection);
 void fnet_write(struct fnet_t *connection, struct buf *buf);

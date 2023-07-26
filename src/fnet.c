@@ -47,17 +47,23 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, struct fnet_conn
   return NULL;
 }
 
-struct fnet_t * fnet_connect(const char *address, struct fnet_connect_options_t *options) {
+struct fnet_t * fnet_connect(const char *address, uint16_t port, struct fnet_connect_options_t *options) {
 
   // Checking arguments are given
   if (!address) {
     fprintf(stderr, "fnet_connect: address argument is required\n");
     return NULL;
   }
+  if (!port) {
+    fprintf(stderr, "fnet_listen: port argument is required\n");
+    return NULL;
+  }
   if (!options) {
     fprintf(stderr, "fnet_connect: options argument is required\n");
     return NULL;
   }
+
+
 
   return NULL;
 }
