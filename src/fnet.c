@@ -2,8 +2,14 @@
 extern "C" {
 #endif
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include "tidwall/buf.h"
 
@@ -13,14 +19,16 @@ extern "C" {
 
 struct fnet_internal_t {
   struct fnet_t ext; // KEEP AT TOP, allows casting between fnet_internal_t* and fnet_t*
-  FNET_SOCKET   sock;
+  FNET_SOCKET   *fds;
+  int           nfds;
   FNET_FLAG     flags;
   FNET_CALLBACK(onConnect);
   FNET_CALLBACK_VA(onData, struct buf *data);
   FNET_CALLBACK(onClose);
 };
 
-struct fnet_t * fnet_listen(const char *address, uint16_t port, struct fnet_connect_options_t *options) {
+struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fnet_options_t *options) {
+  struct fnet_internal_t *conn;
 
   // Checking arguments are given
   if (!address) {
@@ -40,16 +48,117 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, struct fnet_conn
   switch(options->proto) {
     case FNET_PROTO_TCP:
       // Intentionally empty
+      // TODO: tcp-specific arg validation
       break;
     default:
       fprintf(stderr, "fnet_listen: unknown protocol\n");
       return NULL;
   }
 
+  // 1-to-1 copy, don't touch the options
+  conn = malloc(sizeof(struct fnet_internal_t));
+  conn->ext.proto  = options->proto;
+  conn->ext.status = FNET_STATUS_INITIALIZING;
+  conn->ext.udata  = options->udata;
+  conn->flags      = options->flags;
+  conn->onConnect  = options->onConnect;
+  conn->onData     = options->onData;
+  conn->onClose    = options->onClose;
+  conn->nfds       = 0;
+  conn->fds        = NULL;
+
+  /* struct sockaddr_in servaddr; */
+  struct addrinfo hints = {}, *addrs;
+  char port_str[6] = {};
+
+  hints.ai_family   = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = IPPROTO_TCP;
+
+  // Get address info
+  snprintf(port_str, sizeof(port_str), "%d", port);
+  int ai_err = getaddrinfo(address, port_str, &hints, &addrs);
+  if (ai_err != 0) {
+    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(ai_err));
+    fnet_free((struct fnet_t *)conn);
+    return NULL;
+  }
+
+  // Count the addresses to listen on
+  // For example, "localhost" turned to "127.0.0.1" and "::1"
+  int naddrs = 0;
+  struct addrinfo *addrinfo = addrs;
+  while(addrinfo) {
+    naddrs++;
+    addrinfo = addrinfo->ai_next;
+  }
+
+  conn->fds = calloc(naddrs, sizeof(FNET_SOCKET));
+  if (!conn->fds) {
+    fprintf(stderr, "%s\n", strerror(ENOMEM));
+    fnet_free((struct fnet_t *)conn);
+    return NULL;
+  }
+
+  addrinfo = addrs;
+  for (; addrinfo ; addrinfo = addrinfo->ai_next ) {
+
+    int fd = socket(addrinfo->ai_family, addrinfo->ai_socktype, addrinfo->ai_protocol);
+    if (fd < 0) {
+      fprintf(stderr, "socket\n");
+      fnet_free((struct fnet_t *)conn);
+      return NULL;
+    }
+
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
+      fprintf(stderr, "setsockopt(SO_REUSEADDR)\n");
+      fnet_free((struct fnet_t *)conn);
+      return NULL;
+    }
+
+    // TODO: set nonblock
+
+    if (bind(fd, addrinfo->ai_addr, addrinfo->ai_addrlen) < 0) {
+      fprintf(stderr, "bind\n");
+      fnet_free((struct fnet_t *)conn);
+      return NULL;
+    }
+
+    if (listen(fd, SOMAXCONN) < 0) {
+      fprintf(stderr, "bind\n");
+      fnet_free((struct fnet_t *)conn);
+      return NULL;
+    }
+
+    conn->fds[conn->nfds] = fd;
+    conn->nfds++;
+
+  }
+
+  freeaddrinfo(addrs);
+
+  fprintf(stdout, "All fine and dandy: %d\n", naddrs);
+
+  /* servaddr.sin_family      = AF_INET; */
+  /* servaddr.sin_addr.s_addr = htonl(INADDR_ANY); */
+  /* servaddr.sin_port        = htonl(INADDR_ANY); */
+
+
+  /* // TODO: open different kinds of sockets */
+  /* conn->sock = socket(AF_INET, SOCK_STREAM, 0); */
+  /* if (sock < 0) { */
+  /*   fprintf(stderr, "fnet_listen: could not create socket\n"); */
+  /*   fnet_free(conn); */
+  /*   return NULL; */
+  /* } */
+
+
+
+
   return NULL;
 }
 
-struct fnet_t * fnet_connect(const char *address, uint16_t port, struct fnet_connect_options_t *options) {
+struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fnet_options_t *options) {
 
   // Checking arguments are given
   if (!address) {
@@ -79,13 +188,13 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, struct fnet_con
   return NULL;
 }
 
-FNET_RETURNCODE fnet_process(struct fnet_t *connection) {
+FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
   struct fnet_internal_t *conn = (struct fnet_internal_t *)connection;
 
   // Checking arguments are given
   if (!conn) {
     fprintf(stderr, "fnet_process: connection argument is required\n");
-    return FNET_RETURNCODE_MISSING_ARGUMENT:
+    return FNET_RETURNCODE_MISSING_ARGUMENT;
   }
 
   return FNET_RETURNCODE_OK;
@@ -93,7 +202,7 @@ FNET_RETURNCODE fnet_process(struct fnet_t *connection) {
 
 
 
-FNET_RETURNCODE fnet_write(struct fnet_t *connection, struct buf *buf) {
+FNET_RETURNCODE fnet_write(const struct fnet_t *connection, struct buf *buf) {
   struct fnet_internal_t *conn = (struct fnet_internal_t *)connection;
 
   // Checking arguments are given
@@ -109,7 +218,7 @@ FNET_RETURNCODE fnet_write(struct fnet_t *connection, struct buf *buf) {
   return FNET_RETURNCODE_OK;
 }
 
-FNET_RETURNCODE fnet_close(struct fnet_t *connection) {
+FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
   struct fnet_internal_t *conn = (struct fnet_internal_t *)connection;
 
   // Checking arguments are given
@@ -129,6 +238,10 @@ FNET_RETURNCODE fnet_free(struct fnet_t *connection) {
     fprintf(stderr, "fnet_free: connection argument is required\n");
     return FNET_RETURNCODE_MISSING_ARGUMENT;
   }
+
+  // TODO: check if the connections are closed?
+
+  if (conn->fds) free(conn->fds);
 
   free(conn);
 

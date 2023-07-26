@@ -19,11 +19,12 @@ extern "C" {
 #define FNET_RETURNCODE_OK               0
 #define FNET_RETURNCODE_MISSING_ARGUMENT 1
 
-#define FNET_STATUS             uint8_t
-#define FNET_STATUS_CONNECTING  1   // Client-only status
-#define FNET_STATUS_CONNECTED   2   // Client = connected, server = listening
-#define FNET_STATUS_ERROR       4
-#define FNET_STATUS_CLOSED      8
+#define FNET_STATUS               uint8_t
+#define FNET_STATUS_INITIALIZING  0
+#define FNET_STATUS_CONNECTING    1   // Client-only status
+#define FNET_STATUS_READY         2   // Client = connected, server = listening
+#define FNET_STATUS_ERROR         4
+#define FNET_STATUS_CLOSED        8
 
 #define FNET_CALLBACK(NAME) void (*(NAME))(struct fnet_t *connection, void *udata)
 #define FNET_CALLBACK_VA(NAME, ...) void (*(NAME))(struct fnet_t *connection, __VA_ARGS__, void *udata)
@@ -34,7 +35,7 @@ struct fnet_t {
   void *udata;
 };
 
-struct fnet_connect_options_t {
+struct fnet_options_t {
   FNET_PROTOCOL proto;
   FNET_FLAG     flags;
   FNET_CALLBACK(onConnect);
@@ -43,12 +44,12 @@ struct fnet_connect_options_t {
   void *udata;
 };
 
-struct fnet_t * fnet_listen(const char *address, uint16_t port, struct fnet_connect_options_t *options);
-struct fnet_t * fnet_connect(const char *address, uint16_t port, struct fnet_connect_options_t *options);
+struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fnet_options_t *options);
+struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fnet_options_t *options);
 
-FNET_RETURNCODE fnet_process(struct fnet_t *connection);
-FNET_RETURNCODE fnet_write(struct fnet_t *connection, struct buf *buf);
-FNET_RETURNCODE fnet_close(struct fnet_t *connection);
+FNET_RETURNCODE fnet_process(const struct fnet_t *connection);
+FNET_RETURNCODE fnet_write(const struct fnet_t *connection, struct buf *buf);
+FNET_RETURNCODE fnet_close(const struct fnet_t *connection);
 FNET_RETURNCODE fnet_free(struct fnet_t *connection);
 
 FNET_RETURNCODE fnet_step();
