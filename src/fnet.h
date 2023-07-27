@@ -38,17 +38,20 @@ extern "C" {
 
 #define FNET_CALLBACK(NAME) void (*(NAME))(struct fnet_ev *event)
 
-struct fnet_t {
-  FNET_PROTOCOL proto;
-  FNET_STATUS   status;
-  void *udata;
-};
-
 struct fnet_ev {
   struct fnet_t *connection;
   FNET_EVENT     type;
   struct buf    *buffer;
   void          *udata;
+};
+
+struct fnet_t {
+  FNET_PROTOCOL proto;
+  FNET_STATUS   status;
+  FNET_CALLBACK(onConnect);
+  FNET_CALLBACK(onData);
+  FNET_CALLBACK(onClose);
+  void *udata;
 };
 
 struct fnet_options_t {

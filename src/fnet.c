@@ -28,9 +28,6 @@ struct fnet_internal_t {
   FNET_SOCKET   *fds;
   int           nfds;
   FNET_FLAG     flags;
-  FNET_CALLBACK(onConnect);
-  FNET_CALLBACK(onData);
-  FNET_CALLBACK(onClose);
 };
 
 struct fnet_internal_t *connections = NULL;
@@ -76,15 +73,15 @@ int64_t _fnet_now() {
 struct fnet_internal_t * _fnet_init(const struct fnet_options_t *options) {
   // 1-to-1 copy, don't touch the options
   struct fnet_internal_t *conn = malloc(sizeof(struct fnet_internal_t));
-  conn->ext.proto  = options->proto;
-  conn->ext.status = FNET_STATUS_INITIALIZING;
-  conn->ext.udata  = options->udata;
-  conn->flags      = options->flags;
-  conn->onConnect  = options->onConnect;
-  conn->onData     = options->onData;
-  conn->onClose    = options->onClose;
-  conn->nfds       = 0;
-  conn->fds        = NULL;
+  conn->ext.proto     = options->proto;
+  conn->ext.status    = FNET_STATUS_INITIALIZING;
+  conn->ext.udata     = options->udata;
+  conn->flags         = options->flags;
+  conn->ext.onConnect = options->onConnect;
+  conn->ext.onData    = options->onData;
+  conn->ext.onClose   = options->onClose;
+  conn->nfds          = 0;
+  conn->fds           = NULL;
 
   // Aanndd add to the connection tracking list
   conn->next = connections;
@@ -153,7 +150,7 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
     addrinfo = addrinfo->ai_next;
   }
 
-  conn->fds = calloc(naddrs, sizeof(FNET_SOCKET));
+  conn->fds = malloc(naddrs * sizeof(FNET_SOCKET));
   if (!conn->fds) {
     fprintf(stderr, "%s\n", strerror(ENOMEM));
     fnet_free((struct fnet_t *)conn);
@@ -242,10 +239,12 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
 FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
   struct fnet_internal_t *conn = (struct fnet_internal_t *)connection;
   struct fnet_internal_t *nconn = NULL;
-  int i;
+  int i, n;
   FNET_SOCKET nfd;
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);
+  struct buf *rbuf = NULL;
+
 
   // Checking arguments are given
   if (!conn) {
@@ -264,10 +263,39 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
   /*   return FNET_RETURNCODE_NOT_IMPLEMENTED; */
   /* } */
 
-  /* if (conn->ext.status & FNET_STATUS_CONNECTED) { */
-  /*   // TODO: handle client connection */
-  /*   return FNET_RETURNCODE_NOT_IMPLEMENTED; */
-  /* } */
+  if (conn->ext.status & FNET_STATUS_CONNECTED) {
+    rbuf       = malloc(sizeof(struct buf));
+    rbuf->data = malloc(BUFSIZ);
+    rbuf->cap  = BUFSIZ;
+    for ( i = 0 ; i < conn->nfds ; i++ ) {
+      n = read(conn->fds[i], rbuf->data, rbuf->cap);
+      if (n < 0) {
+        if (errno == EAGAIN) continue;
+        buf_clear(rbuf);
+        free(rbuf);
+        return FNET_RETURNCODE_ERRNO;
+      }
+      rbuf->len = n;
+      if (rbuf->len == 0) {
+        // TODO: handle connection close
+        printf("zero?\n");
+        buf_clear(rbuf);
+        free(rbuf);
+        return FNET_RETURNCODE_NOT_IMPLEMENTED;
+      }
+      if (conn->ext.onData) {
+        conn->ext.onData(&((struct fnet_ev){
+          .connection = (struct fnet_t *)conn,
+          .type       = FNET_EVENT_DATA,
+          .buffer     = rbuf,
+          .udata      = conn->ext.udata,
+        }));
+      }
+    }
+    buf_clear(rbuf);
+    free(rbuf);
+    return FNET_RETURNCODE_OK;
+  }
 
   if (conn->ext.status & FNET_STATUS_LISTENING) {
     for ( i = 0 ; i < conn->nfds ; i++ ) {
@@ -305,8 +333,8 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
       nconn->nfds       = 1;
       nconn->ext.status = FNET_STATUS_CONNECTED;
 
-      if (conn->onConnect) {
-        conn->onConnect(&((struct fnet_ev){
+      if (conn->ext.onConnect) {
+        conn->ext.onConnect(&((struct fnet_ev){
           .connection = (struct fnet_t *)nconn,
           .type       = FNET_EVENT_CONNECT,
           .buffer     = NULL,

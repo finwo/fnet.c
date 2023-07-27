@@ -4,8 +4,13 @@
 
 #include "fnet.h"
 
+void onData(struct fnet_ev *ev) {
+  printf("Data(%d): %.*s\n", ev->buffer->len, (int)(ev->buffer->len), ev->buffer->data);
+}
+
 void onConnect(struct fnet_ev *ev) {
   printf("Connection!!\n");
+  ev->connection->onData = onData;
 }
 
 int main() {
@@ -18,7 +23,7 @@ int main() {
     .udata     = NULL,
   };
 
-  struct fnet_t *conn = fnet_listen("0.0.0.0", 1337, &opts);
+  fnet_listen("0.0.0.0", 1337, &opts);
   fnet_main();
 
   return 42;
