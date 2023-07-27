@@ -265,7 +265,13 @@ FNET_RETURNCODE fnet_free(struct fnet_t *connection) {
 }
 
 FNET_RETURNCODE fnet_step() {
-  // TODO: process all open fnet instances
+  struct fnet_internal_t *conn = connections;
+  FNET_RETURNCODE ret;
+  while(conn) {
+    ret = fnet_process(conn);
+    if (ret < 0) return ret;
+    conn = conn->next;
+  }
   return FNET_RETURNCODE_OK;
 }
 
