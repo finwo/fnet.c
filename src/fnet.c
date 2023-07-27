@@ -7,9 +7,11 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <netinet/tcp.h>
 
 #include "tidwall/buf.h"
 
@@ -26,6 +28,16 @@ struct fnet_internal_t {
   FNET_CALLBACK_VA(onData, struct buf *data);
   FNET_CALLBACK(onClose);
 };
+
+int settcpnodelay(int fd) {
+  return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &(int){1}, sizeof(int));
+}
+
+int setnonblock(int fd) {
+  int flags = fcntl(fd, F_GETFL, 0);
+  if (flags < 0) return flags;
+  return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
 
 struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fnet_options_t *options) {
   struct fnet_internal_t *conn;
@@ -116,7 +128,11 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
       return NULL;
     }
 
-    // TODO: set nonblock
+    if (setnonblock(fd) < 0) {
+      fprintf(stderr, "setnonblock\n");
+      fnet_free((struct fnet_t *)conn);
+      return NULL;
+    }
 
     if (bind(fd, addrinfo->ai_addr, addrinfo->ai_addrlen) < 0) {
       fprintf(stderr, "bind\n");
@@ -132,30 +148,11 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
 
     conn->fds[conn->nfds] = fd;
     conn->nfds++;
-
   }
 
   freeaddrinfo(addrs);
 
-  fprintf(stdout, "All fine and dandy: %d\n", naddrs);
-
-  /* servaddr.sin_family      = AF_INET; */
-  /* servaddr.sin_addr.s_addr = htonl(INADDR_ANY); */
-  /* servaddr.sin_port        = htonl(INADDR_ANY); */
-
-
-  /* // TODO: open different kinds of sockets */
-  /* conn->sock = socket(AF_INET, SOCK_STREAM, 0); */
-  /* if (sock < 0) { */
-  /*   fprintf(stderr, "fnet_listen: could not create socket\n"); */
-  /*   fnet_free(conn); */
-  /*   return NULL; */
-  /* } */
-
-
-
-
-  return NULL;
+  return conn;
 }
 
 struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fnet_options_t *options) {
