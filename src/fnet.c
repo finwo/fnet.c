@@ -6,6 +6,8 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/time.h>
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -27,11 +29,32 @@ struct fnet_internal_t {
   int           nfds;
   FNET_FLAG     flags;
   FNET_CALLBACK(onConnect);
-  FNET_CALLBACK_VA(onData, struct buf *data);
+  FNET_CALLBACK(onData);
   FNET_CALLBACK(onClose);
 };
 
 struct fnet_internal_t *connections = NULL;
+
+int setkeepalive(int fd) {
+    if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &(int){1}, sizeof(int))) {
+        return -1;
+    }
+#if defined(__linux__)
+    // tcp_keepalive_time
+    if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &(int){600}, sizeof(int))) {
+        return -1;
+    }
+    // tcp_keepalive_intvl
+    if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &(int){60}, sizeof(int))) {
+        return -1;
+    }
+    // tcp_keepalive_probes
+    if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &(int){6}, sizeof(int))) {
+        return -1;
+    }
+#endif
+    return 0;
+}
 
 int settcpnodelay(int fd) {
   return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &(int){1}, sizeof(int));
@@ -42,6 +65,36 @@ int setnonblock(int fd) {
   if (flags < 0) return flags;
   return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
+
+int64_t _fnet_now() {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (tv.tv_sec * ((int64_t)1000000)) + tv.tv_usec;
+}
+
+// CAUTION: assumes options have been vetted
+struct fnet_internal_t * _fnet_init(const struct fnet_options_t *options) {
+  // 1-to-1 copy, don't touch the options
+  struct fnet_internal_t *conn = malloc(sizeof(struct fnet_internal_t));
+  conn->ext.proto  = options->proto;
+  conn->ext.status = FNET_STATUS_INITIALIZING;
+  conn->ext.udata  = options->udata;
+  conn->flags      = options->flags;
+  conn->onConnect  = options->onConnect;
+  conn->onData     = options->onData;
+  conn->onClose    = options->onClose;
+  conn->nfds       = 0;
+  conn->fds        = NULL;
+
+  // Aanndd add to the connection tracking list
+  conn->next = connections;
+  if (connections) connections->prev = conn;
+  connections = conn;
+
+  // Done
+  return conn;
+}
+
 
 struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fnet_options_t *options) {
   struct fnet_internal_t *conn;
@@ -72,21 +125,7 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
   }
 
   // 1-to-1 copy, don't touch the options
-  conn = malloc(sizeof(struct fnet_internal_t));
-  conn->ext.proto  = options->proto;
-  conn->ext.status = FNET_STATUS_INITIALIZING;
-  conn->ext.udata  = options->udata;
-  conn->flags      = options->flags;
-  conn->onConnect  = options->onConnect;
-  conn->onData     = options->onData;
-  conn->onClose    = options->onClose;
-  conn->nfds       = 0;
-  conn->fds        = NULL;
-
-  // Aanndd add to the connection tracking list
-  conn->next = connections;
-  if (connections) connections->prev = conn;
-  connections = conn;
+  conn = _fnet_init(options);
 
   /* struct sockaddr_in servaddr; */
   struct addrinfo hints = {}, *addrs;
@@ -166,7 +205,8 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
   }
 
   freeaddrinfo(addrs);
-  return conn;
+  conn->ext.status = FNET_STATUS_LISTENING;
+  return (struct fnet_t *)conn;
 }
 
 struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fnet_options_t *options) {
@@ -201,6 +241,11 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
 
 FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
   struct fnet_internal_t *conn = (struct fnet_internal_t *)connection;
+  struct fnet_internal_t *nconn = NULL;
+  int i;
+  FNET_SOCKET nfd;
+  struct sockaddr_storage addr;
+  socklen_t addrlen = sizeof(addr);
 
   // Checking arguments are given
   if (!conn) {
@@ -208,10 +253,74 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
     return FNET_RETURNCODE_MISSING_ARGUMENT;
   }
 
+  // No processing to be done here
+  if (conn->ext.status == FNET_STATUS_INITIALIZING) return FNET_RETURNCODE_OK;
+  if (conn->ext.status &  FNET_STATUS_ERROR       ) return FNET_RETURNCODE_OK;
+  if (conn->ext.status &  FNET_STATUS_CLOSED      ) return FNET_RETURNCODE_OK;
+
+  /* // Handle client still connecting */
+  /* if (conn->ext.status & FNET_STATUS_CONNECTING) { */
+  /*   // TODO: handle client connecting */
+  /*   return FNET_RETURNCODE_NOT_IMPLEMENTED; */
+  /* } */
+
+  /* if (conn->ext.status & FNET_STATUS_CONNECTED) { */
+  /*   // TODO: handle client connection */
+  /*   return FNET_RETURNCODE_NOT_IMPLEMENTED; */
+  /* } */
+
+  if (conn->ext.status & FNET_STATUS_LISTENING) {
+    for ( i = 0 ; i < conn->nfds ; i++ ) {
+      nfd = accept(conn->fds[i], (struct sockaddr *)&addr, &addrlen);
+
+      if (nfd < 0) {
+        if (
+          (errno == EAGAIN) ||
+          (errno == EWOULDBLOCK)
+        ) {
+          // Simply no connections to accept
+          continue;
+        }
+        // Indicate the errno is set
+        return FNET_RETURNCODE_ERRNO;
+      }
+
+      // Make this one non-blocking and stay alive
+      if (setnonblock(nfd) < 0) return FNET_RETURNCODE_ERROR;
+      if (setkeepalive(nfd) < 0) return FNET_RETURNCODE_ERROR;
+
+      // Create new fnet_t instance
+      // _init already tracks the connection
+      nconn = _fnet_init(&((struct fnet_options_t){
+        .proto     = conn->ext.proto,
+        .flags     = conn->flags & (~FNET_FLAG_RECONNECT),
+        .onConnect = NULL,
+        .onData    = NULL,
+        .onClose   = NULL,
+        .udata     = NULL,
+      }));
+
+      nconn->fds        = malloc(sizeof(FNET_SOCKET));
+      nconn->fds[0]     = nfd;
+      nconn->nfds       = 1;
+      nconn->ext.status = FNET_STATUS_CONNECTED;
+
+      if (conn->onConnect) {
+        conn->onConnect(&((struct fnet_ev){
+          .connection = (struct fnet_t *)nconn,
+          .type       = FNET_EVENT_CONNECT,
+          .buffer     = NULL,
+          .udata      = conn->ext.udata,
+        }));
+      }
+    }
+
+    // TODO: handle client connection
+    return FNET_RETURNCODE_OK;
+  }
+
   return FNET_RETURNCODE_OK;
 }
-
-
 
 FNET_RETURNCODE fnet_write(const struct fnet_t *connection, struct buf *buf) {
   struct fnet_internal_t *conn = (struct fnet_internal_t *)connection;
@@ -238,6 +347,10 @@ FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
     return FNET_RETURNCODE_MISSING_ARGUMENT;
   }
 
+  // TODO: actually close the connection
+  // TODO: call onclose
+  // TODO: call free
+
   return FNET_RETURNCODE_OK;
 }
 
@@ -251,8 +364,8 @@ FNET_RETURNCODE fnet_free(struct fnet_t *connection) {
   }
 
   // Remove ourselves from the linked list
-  if (conn->next) conn->next->prev = conn->prev;
-  if (conn->prev) conn->prev->next = conn->next;
+  if (conn->next) ((struct fnet_internal_t *)(conn->next))->prev = conn->prev;
+  if (conn->prev) ((struct fnet_internal_t *)(conn->prev))->next = conn->next;
   if (conn == connections) connections = conn->next;
 
   // TODO: check if the connections are closed?
@@ -268,7 +381,7 @@ FNET_RETURNCODE fnet_step() {
   struct fnet_internal_t *conn = connections;
   FNET_RETURNCODE ret;
   while(conn) {
-    ret = fnet_process(conn);
+    ret = fnet_process((struct fnet_t *)conn);
     if (ret < 0) return ret;
     conn = conn->next;
   }
@@ -277,11 +390,23 @@ FNET_RETURNCODE fnet_step() {
 
 FNET_RETURNCODE fnet_main() {
   FNET_RETURNCODE ret;
+  int64_t         ttime = _fnet_now();
+  int64_t         tdiff;
+
   while(1) {
     // TODO: handle kill signal?
     // TODO: dynamic sleep to have 10ms - 100ms tick?
-    ret = fnet_step();
+    ret   = fnet_step();
     if (ret) return ret;
+
+    // Sleep 10ms to lower cpu consumption
+    ttime = ttime + 10000;
+    tdiff = ttime - _fnet_now();
+    if (tdiff <= 0) {
+      ttime = 10 + ttime - tdiff;
+      tdiff = 10;
+    }
+    usleep(tdiff);
   }
 
   // TODO: is this really ok?

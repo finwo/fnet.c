@@ -17,14 +17,19 @@ extern "C" {
 
 #define FNET_RETURNCODE                  int
 #define FNET_RETURNCODE_OK               0
-#define FNET_RETURNCODE_MISSING_ARGUMENT 1
+#define FNET_RETURNCODE_ERROR            -1
+#define FNET_RETURNCODE_MISSING_ARGUMENT -2
+#define FNET_RETURNCODE_NOT_IMPLEMENTED  -3
+#define FNET_RETURNCODE_ERRNO            -4
 
 #define FNET_STATUS               uint8_t
-#define FNET_STATUS_INITIALIZING  0
-#define FNET_STATUS_CONNECTING    1   // Client-only status
-#define FNET_STATUS_READY         2   // Client = connected, server = listening
-#define FNET_STATUS_ERROR         4
-#define FNET_STATUS_CLOSED        8
+#define FNET_STATUS_INITIALIZING   0
+#define FNET_STATUS_CONNECTING     1 // Client-only status
+#define FNET_STATUS_CONNECTED      2 // Client ready
+#define FNET_STATUS_LISTENING      4 // Listen ready
+#define FNET_STATUS_READY          6 // Any ready
+#define FNET_STATUS_ERROR          8
+#define FNET_STATUS_CLOSED        16
 
 #define FNET_EVENT         int
 #define FNET_EVENT_CONNECT 1
