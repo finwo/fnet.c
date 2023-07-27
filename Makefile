@@ -25,3 +25,7 @@ $(OBJ): $(SRC)
 
 $(BIN): $(OBJ)
 	$(CC) $(LDFLAGS) $(OBJ) -o $@
+
+.PHONY: clean
+clean:
+	rm -f $(OBJ)
