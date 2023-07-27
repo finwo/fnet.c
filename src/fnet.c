@@ -21,6 +21,8 @@ extern "C" {
 
 struct fnet_internal_t {
   struct fnet_t ext; // KEEP AT TOP, allows casting between fnet_internal_t* and fnet_t*
+  void          *prev;
+  void          *next;
   FNET_SOCKET   *fds;
   int           nfds;
   FNET_FLAG     flags;
@@ -28,6 +30,8 @@ struct fnet_internal_t {
   FNET_CALLBACK_VA(onData, struct buf *data);
   FNET_CALLBACK(onClose);
 };
+
+struct fnet_internal_t *connections = NULL;
 
 int settcpnodelay(int fd) {
   return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &(int){1}, sizeof(int));
@@ -79,6 +83,11 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
   conn->nfds       = 0;
   conn->fds        = NULL;
 
+  // Aanndd add to the connection tracking list
+  conn->next = connections;
+  if (connections) connections->prev = conn;
+  connections = conn;
+
   /* struct sockaddr_in servaddr; */
   struct addrinfo hints = {}, *addrs;
   char port_str[6] = {};
@@ -109,6 +118,7 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
   if (!conn->fds) {
     fprintf(stderr, "%s\n", strerror(ENOMEM));
     fnet_free((struct fnet_t *)conn);
+    freeaddrinfo(addrs);
     return NULL;
   }
 
@@ -119,30 +129,35 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
     if (fd < 0) {
       fprintf(stderr, "socket\n");
       fnet_free((struct fnet_t *)conn);
+      freeaddrinfo(addrs);
       return NULL;
     }
 
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
       fprintf(stderr, "setsockopt(SO_REUSEADDR)\n");
       fnet_free((struct fnet_t *)conn);
+      freeaddrinfo(addrs);
       return NULL;
     }
 
     if (setnonblock(fd) < 0) {
       fprintf(stderr, "setnonblock\n");
       fnet_free((struct fnet_t *)conn);
+      freeaddrinfo(addrs);
       return NULL;
     }
 
     if (bind(fd, addrinfo->ai_addr, addrinfo->ai_addrlen) < 0) {
       fprintf(stderr, "bind\n");
       fnet_free((struct fnet_t *)conn);
+      freeaddrinfo(addrs);
       return NULL;
     }
 
     if (listen(fd, SOMAXCONN) < 0) {
       fprintf(stderr, "bind\n");
       fnet_free((struct fnet_t *)conn);
+      freeaddrinfo(addrs);
       return NULL;
     }
 
@@ -151,7 +166,6 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
   }
 
   freeaddrinfo(addrs);
-
   return conn;
 }
 
@@ -235,6 +249,11 @@ FNET_RETURNCODE fnet_free(struct fnet_t *connection) {
     fprintf(stderr, "fnet_free: connection argument is required\n");
     return FNET_RETURNCODE_MISSING_ARGUMENT;
   }
+
+  // Remove ourselves from the linked list
+  if (conn->next) conn->next->prev = conn->prev;
+  if (conn->prev) conn->prev->next = conn->next;
+  if (conn == connections) connections = conn->next;
 
   // TODO: check if the connections are closed?
 

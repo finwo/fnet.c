@@ -26,8 +26,12 @@ extern "C" {
 #define FNET_STATUS_ERROR         4
 #define FNET_STATUS_CLOSED        8
 
-#define FNET_CALLBACK(NAME) void (*(NAME))(struct fnet_t *connection, void *udata)
-#define FNET_CALLBACK_VA(NAME, ...) void (*(NAME))(struct fnet_t *connection, __VA_ARGS__, void *udata)
+#define FNET_EVENT         int
+#define FNET_EVENT_CONNECT 1
+#define FNET_EVENT_DATA    2
+#define FNET_EVENT_CLOSE   3
+
+#define FNET_CALLBACK(NAME) void (*(NAME))(struct fnet_ev *event)
 
 struct fnet_t {
   FNET_PROTOCOL proto;
@@ -35,11 +39,18 @@ struct fnet_t {
   void *udata;
 };
 
+struct fnet_ev {
+  struct fnet_t *connection;
+  FNET_EVENT     type;
+  struct buf    *buffer;
+  void          *udata;
+};
+
 struct fnet_options_t {
   FNET_PROTOCOL proto;
   FNET_FLAG     flags;
   FNET_CALLBACK(onConnect);
-  FNET_CALLBACK_VA(onData, struct buf *data);
+  FNET_CALLBACK(onData);
   FNET_CALLBACK(onClose);
   void *udata;
 };
