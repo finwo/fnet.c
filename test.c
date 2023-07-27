@@ -4,13 +4,18 @@
 
 #include "fnet.h"
 
+void onClose(struct fnet_ev *ev) {
+  printf("Connection closed!\n");
+}
+
 void onData(struct fnet_ev *ev) {
   printf("Data(%d): %.*s\n", ev->buffer->len, (int)(ev->buffer->len), ev->buffer->data);
 }
 
 void onConnect(struct fnet_ev *ev) {
   printf("Connection!!\n");
-  ev->connection->onData = onData;
+  ev->connection->onData  = onData;
+  ev->connection->onClose = onClose;
 }
 
 int main() {

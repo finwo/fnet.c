@@ -277,11 +277,8 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
       }
       rbuf->len = n;
       if (rbuf->len == 0) {
-        // TODO: handle connection close
-        printf("zero?\n");
-        buf_clear(rbuf);
-        free(rbuf);
-        return FNET_RETURNCODE_NOT_IMPLEMENTED;
+        fnet_close(conn);
+        break;
       }
       if (conn->ext.onData) {
         conn->ext.onData(&((struct fnet_ev){
@@ -368,6 +365,7 @@ FNET_RETURNCODE fnet_write(const struct fnet_t *connection, struct buf *buf) {
 
 FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
   struct fnet_internal_t *conn = (struct fnet_internal_t *)connection;
+  int i;
 
   // Checking arguments are given
   if (!conn) {
@@ -375,9 +373,23 @@ FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
     return FNET_RETURNCODE_MISSING_ARGUMENT;
   }
 
-  // TODO: actually close the connection
-  // TODO: call onclose
-  // TODO: call free
+  if (conn->fds) {
+    for ( i = 0 ; i < conn->nfds ; i++ ) {
+      close(conn->fds[i]);
+    }
+    conn->nfds = 0;
+    free(conn->fds);
+    conn->fds = NULL;
+  }
+
+  if (conn->ext.onClose) {
+    conn->ext.onClose(&((struct fnet_ev){
+      .connection = (struct fnet_t *)conn,
+      .type       = FNET_EVENT_CLOSE,
+      .buffer     = NULL,
+      .udata      = conn->ext.udata,
+    }));
+  }
 
   return FNET_RETURNCODE_OK;
 }
