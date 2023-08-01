@@ -95,7 +95,7 @@ int main(int argc, const char *argv[]) {
       .onData    = NULL,
       .onTick    = onTick,
       .onClose   = NULL,
-      .udata     = &mode,
+      .udata     = NULL,
     };
     fnet_listen(addr, port, &opts);
     fnet_main();

@@ -26,11 +26,12 @@ extern "C" {
 #define FNET_STATUS               uint8_t
 #define FNET_STATUS_INITIALIZING   0
 #define FNET_STATUS_CONNECTING     1 // Client-only status
-#define FNET_STATUS_CONNECTED      2 // Client ready
+#define FNET_STATUS_CONNECTED      2 // Connection ready
 #define FNET_STATUS_LISTENING      4 // Listen ready
 #define FNET_STATUS_READY          6 // Any ready
-#define FNET_STATUS_ERROR          8
-#define FNET_STATUS_CLOSED        16
+#define FNET_STATUS_ACCEPTED       8 // Whether the connection is an accepted one
+#define FNET_STATUS_ERROR         16
+#define FNET_STATUS_CLOSED        32
 
 #define FNET_EVENT         int
 #define FNET_EVENT_CONNECT 1

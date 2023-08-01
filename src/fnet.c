@@ -253,9 +253,9 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
   }
 
   // No processing to be done here
-  if (conn->ext.status == FNET_STATUS_INITIALIZING) return FNET_RETURNCODE_OK;
-  if (conn->ext.status &  FNET_STATUS_ERROR       ) return FNET_RETURNCODE_OK;
-  if (conn->ext.status &  FNET_STATUS_CLOSED      ) return FNET_RETURNCODE_OK;
+  if (conn->ext.status & FNET_STATUS_INITIALIZING) return FNET_RETURNCODE_OK;
+  if (conn->ext.status & FNET_STATUS_ERROR       ) return FNET_RETURNCODE_OK;
+  if (conn->ext.status & FNET_STATUS_CLOSED      ) return FNET_RETURNCODE_OK;
 
   /* // Handle client still connecting */
   /* if (conn->ext.status & FNET_STATUS_CONNECTING) { */
@@ -330,7 +330,7 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
       nconn->fds        = malloc(sizeof(FNET_SOCKET));
       nconn->fds[0]     = nfd;
       nconn->nfds       = 1;
-      nconn->ext.status = FNET_STATUS_CONNECTED;
+      nconn->ext.status = FNET_STATUS_CONNECTED | FNET_STATUS_ACCEPTED;
 
       if (conn->ext.onConnect) {
         conn->ext.onConnect(&((struct fnet_ev){
