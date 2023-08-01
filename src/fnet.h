@@ -35,7 +35,8 @@ extern "C" {
 #define FNET_EVENT         int
 #define FNET_EVENT_CONNECT 1
 #define FNET_EVENT_DATA    2
-#define FNET_EVENT_CLOSE   3
+#define FNET_EVENT_TICK    3
+#define FNET_EVENT_CLOSE   4
 
 #define FNET_CALLBACK(NAME) void (*(NAME))(struct fnet_ev *event)
 
@@ -51,6 +52,7 @@ struct fnet_t {
   FNET_STATUS   status;
   FNET_CALLBACK(onConnect);
   FNET_CALLBACK(onData);
+  FNET_CALLBACK(onTick);
   FNET_CALLBACK(onClose);
   void *udata;
 };
@@ -60,6 +62,7 @@ struct fnet_options_t {
   FNET_FLAG     flags;
   FNET_CALLBACK(onConnect);
   FNET_CALLBACK(onData);
+  FNET_CALLBACK(onTick);
   FNET_CALLBACK(onClose);
   void *udata;
 };

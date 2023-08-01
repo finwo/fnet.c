@@ -22,6 +22,10 @@ void onConnect(struct fnet_ev *ev) {
   ev->connection->onClose = onClose;
 }
 
+void onTick(struct fnet_ev *ev) {
+  printf("tick\n");
+}
+
 int main(int argc, const char *argv[]) {
   int i, n;
 
@@ -89,6 +93,7 @@ int main(int argc, const char *argv[]) {
       .flags     = 0,
       .onConnect = onConnect,
       .onData    = NULL,
+      .onTick    = onTick,
       .onClose   = NULL,
       .udata     = &mode,
     };

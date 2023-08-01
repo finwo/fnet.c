@@ -79,6 +79,7 @@ struct fnet_internal_t * _fnet_init(const struct fnet_options_t *options) {
   conn->flags         = options->flags;
   conn->ext.onConnect = options->onConnect;
   conn->ext.onData    = options->onData;
+  conn->ext.onTick    = options->onTick;
   conn->ext.onClose   = options->onClose;
   conn->nfds          = 0;
   conn->fds           = NULL;
@@ -245,7 +246,6 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
   socklen_t addrlen = sizeof(addr);
   struct buf *rbuf = NULL;
 
-
   // Checking arguments are given
   if (!conn) {
     fprintf(stderr, "fnet_process: connection argument is required\n");
@@ -289,6 +289,7 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
         }));
       }
     }
+
     buf_clear(rbuf);
     free(rbuf);
     return FNET_RETURNCODE_OK;
@@ -321,6 +322,7 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
         .flags     = conn->flags & (~FNET_FLAG_RECONNECT),
         .onConnect = NULL,
         .onData    = NULL,
+        .onTick    = NULL,
         .onClose   = NULL,
         .udata     = NULL,
       }));
@@ -457,6 +459,14 @@ FNET_RETURNCODE fnet_tick() {
   while(conn) {
     ret = fnet_process((struct fnet_t *)conn);
     if (ret < 0) return ret;
+    if (conn->ext.onTick) {
+      conn->ext.onTick(&((struct fnet_ev){
+        .connection = (struct fnet_t *)conn,
+        .type       = FNET_EVENT_TICK,
+        .buffer     = NULL,
+        .udata      = conn->ext.udata,
+      }));
+    }
     conn = conn->next;
   }
   return FNET_RETURNCODE_OK;
@@ -486,8 +496,6 @@ FNET_RETURNCODE fnet_main() {
   // TODO: is this really ok?
   return FNET_RETURNCODE_OK;
 }
-
-
 
 #ifdef __cplusplus
 } // extern "C"
