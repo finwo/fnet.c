@@ -360,6 +360,40 @@ FNET_RETURNCODE fnet_write(const struct fnet_t *connection, struct buf *buf) {
     return FNET_RETURNCODE_MISSING_ARGUMENT;
   }
 
+  // A listening socket is not a connection
+  if (conn->ext.status & FNET_STATUS_LISTENING) {
+    fprintf(stderr, "fnet_write: Writing to a listening socket is not possible\n");
+    return FNET_RETURNCODE_UNPROCESSABLE;
+  }
+
+  // How would I do this?? :S
+  if (conn->nfds > 1) {
+    fprintf(stderr, "fnet_write: Only connections with 1 file descriptor supported\n");
+    return FNET_RETURNCODE_NOT_IMPLEMENTED;
+  }
+  if (conn->nfds < 1) {
+    fprintf(stderr, "fnet_write: Only connections with 1 file descriptor supported\n");
+    return FNET_RETURNCODE_NOT_IMPLEMENTED;
+  }
+
+  int n = 0;
+  ssize_t r;
+  while(n < buf->len) {
+    r = write(conn->fds[0], &(buf->data[n]), buf->len - n);
+    // Handle errors
+    if (r < 0) {
+      if (errno == EAGAIN) {
+        continue; // Try again
+      }
+      // We don't have a way to handle this error (yet)
+      fprintf(stderr, "fnet_write: Unable to write to connection\n");
+      return FNET_RETURNCODE_ERRNO;
+    }
+    // Increment counter with amount of bytes written
+    // Allows for a partial write to not corrupt the data stream
+    n += r;
+  }
+
   return FNET_RETURNCODE_OK;
 }
 

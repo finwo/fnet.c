@@ -10,6 +10,9 @@ void onClose(struct fnet_ev *ev) {
 
 void onData(struct fnet_ev *ev) {
   printf("Data(%d): %.*s\n", ev->buffer->len, (int)(ev->buffer->len), ev->buffer->data);
+
+  // Simple echo
+  fnet_write(ev->connection, ev->buffer);
 }
 
 void onConnect(struct fnet_ev *ev) {
