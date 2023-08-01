@@ -425,7 +425,11 @@ FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
       .buffer     = NULL,
       .udata      = conn->ext.udata,
     }));
+
+    conn->ext.onClose = NULL;
   }
+
+  // TODO: set closed flag
 
   return FNET_RETURNCODE_OK;
 }
@@ -444,7 +448,7 @@ FNET_RETURNCODE fnet_free(struct fnet_t *connection) {
   if (conn->prev) ((struct fnet_internal_t *)(conn->prev))->next = conn->next;
   if (conn == connections) connections = conn->next;
 
-  // TODO: check if the connections are closed?
+  fnet_close(conn);
 
   if (conn->fds) free(conn->fds);
 
