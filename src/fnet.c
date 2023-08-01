@@ -208,6 +208,7 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
 }
 
 struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fnet_options_t *options) {
+  struct fnet_internal_t *conn;
 
   // Checking arguments are given
   if (!address) {
@@ -215,7 +216,7 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
     return NULL;
   }
   if (!port) {
-    fprintf(stderr, "fnet_listen: port argument is required\n");
+    fprintf(stderr, "fnet_connect: port argument is required\n");
     return NULL;
   }
   if (!options) {
@@ -233,8 +234,88 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
       return NULL;
   }
 
+  // 1-to-1 copy, don't touch the options
+  conn = _fnet_init(options);
 
-  return NULL;
+  /* struct sockaddr_in servaddr; */
+  struct addrinfo hints = {}, *addrs;
+  char port_str[6] = {};
+
+  hints.ai_family   = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = IPPROTO_TCP;
+
+  // Get address info
+  snprintf(port_str, sizeof(port_str), "%d", port);
+  int ai_err = getaddrinfo(address, port_str, &hints, &addrs);
+  if (ai_err != 0) {
+    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(ai_err));
+    fnet_free((struct fnet_t *)conn);
+    return NULL;
+  }
+
+  // Count the addresses to listen on
+  // For example, "localhost" turned to "127.0.0.1" and "::1"
+  int naddrs = 0;
+  struct addrinfo *addrinfo = addrs;
+  while(addrinfo) {
+    naddrs++;
+    addrinfo = addrinfo->ai_next;
+  }
+
+  conn->fds = malloc(sizeof(FNET_SOCKET));
+  if (!conn->fds) {
+    fprintf(stderr, "%s\n", strerror(ENOMEM));
+    fnet_free((struct fnet_t *)conn);
+    freeaddrinfo(addrs);
+    return NULL;
+  }
+
+  fprintf(stderr, "Addresses: %d\n", naddrs);
+
+  addrinfo = addrs;
+  for (; addrinfo ; addrinfo = addrinfo->ai_next ) {
+
+    int fd = socket(addrinfo->ai_family, addrinfo->ai_socktype, addrinfo->ai_protocol);
+    if (fd < 0) {
+      fprintf(stderr, "socket\n");
+      fnet_free((struct fnet_t *)conn);
+      freeaddrinfo(addrs);
+      return NULL;
+    }
+
+    // Skip found address on failure to connect
+    if (connect(fd, addrinfo->ai_addr, sizeof(struct sockaddr))) {
+      close(fd);
+      continue;
+    }
+
+    if (setnonblock(fd) < 0) {
+      close(fd);
+      fprintf(stderr, "setnonblock\n");
+      fnet_free((struct fnet_t *)conn);
+      freeaddrinfo(addrs);
+      return NULL;
+    }
+
+    conn->fds[conn->nfds] = fd;
+    conn->nfds++;
+
+    // Only need 1 connection
+    break;
+  }
+
+  freeaddrinfo(addrs);
+
+  // Could not connect, might be unreachable, might be something else
+  // We're not checking for the WHY here
+  if (conn->nfds != 1) {
+    fnet_free((struct fnet_t *)conn);
+    return NULL;
+  }
+
+  conn->ext.status = FNET_STATUS_CONNECTED;
+  return conn;
 }
 
 FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
