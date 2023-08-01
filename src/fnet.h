@@ -72,7 +72,7 @@ FNET_RETURNCODE fnet_write(const struct fnet_t *connection, struct buf *buf);
 FNET_RETURNCODE fnet_close(const struct fnet_t *connection);
 FNET_RETURNCODE fnet_free(struct fnet_t *connection);
 
-FNET_RETURNCODE fnet_step();
+FNET_RETURNCODE fnet_tick();
 FNET_RETURNCODE fnet_main();
 
 #ifdef __cplusplus

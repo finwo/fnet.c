@@ -451,7 +451,7 @@ FNET_RETURNCODE fnet_free(struct fnet_t *connection) {
   return FNET_RETURNCODE_OK;
 }
 
-FNET_RETURNCODE fnet_step() {
+FNET_RETURNCODE fnet_tick() {
   struct fnet_internal_t *conn = connections;
   FNET_RETURNCODE ret;
   while(conn) {
@@ -470,7 +470,7 @@ FNET_RETURNCODE fnet_main() {
   while(1) {
     // TODO: handle kill signal?
     // TODO: dynamic sleep to have 10ms - 100ms tick?
-    ret   = fnet_step();
+    ret   = fnet_tick();
     if (ret) return ret;
 
     // Sleep 10ms to lower cpu consumption
