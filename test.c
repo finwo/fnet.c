@@ -12,8 +12,11 @@ void onClose(struct fnet_ev *ev) {
 void onData(struct fnet_ev *ev) {
   printf("Data(%d): %.*s\n", ev->buffer->len, (int)(ev->buffer->len), ev->buffer->data);
 
-  // Simple echo
-  fnet_write(ev->connection, ev->buffer);
+  // Simple echo if it was an accepted connection
+  if (ev->connection->status & FNET_STATUS_ACCEPTED) {
+    fnet_write(ev->connection, ev->buffer);
+  }
+
 }
 
 void onConnect(struct fnet_ev *ev) {
@@ -24,6 +27,10 @@ void onConnect(struct fnet_ev *ev) {
 
 void onTick(struct fnet_ev *ev) {
   printf("tick\n");
+  fnet_write(ev->connection, &((struct buf){
+    .len  = 12,
+    .data = "Hello World\n",
+  }));
 }
 
 int main(int argc, const char *argv[]) {
@@ -88,16 +95,29 @@ int main(int argc, const char *argv[]) {
 
 
   if (mode == 1) {
-    const struct fnet_options_t opts = {
+    fnet_listen(addr, port, &((struct fnet_options_t){
       .proto     = FNET_PROTO_TCP,
       .flags     = 0,
       .onConnect = onConnect,
       .onData    = NULL,
-      .onTick    = onTick,
+      .onTick    = NULL,
       .onClose   = NULL,
       .udata     = NULL,
-    };
-    fnet_listen(addr, port, &opts);
+    }));
+    fnet_main();
+    return 0;
+  }
+
+  if (mode == 2) {
+    fnet_connect(addr, port, &((struct fnet_options_t){
+      .proto     = FNET_PROTO_TCP,
+      .flags     = 0,
+      .onConnect = onConnect,
+      .onData    = onData,
+      .onTick    = onTick,
+      .onClose   = onClose,
+      .udata     = NULL,
+    }));
     fnet_main();
     return 0;
   }
