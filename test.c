@@ -26,15 +26,24 @@ void onConnect(struct fnet_ev *ev) {
 }
 
 void onTick(struct fnet_ev *ev) {
-  printf("tick\n");
+  const char *data = "Hello world!";
+  int cnt = *((int*)ev->udata);
+
   fnet_write(ev->connection, &((struct buf){
-    .len  = 12,
-    .data = "Hello World\n",
+    .len  = strlen(data),
+    .data = data,
   }));
+
+  cnt++;
+  *((int*)ev->udata) = cnt;
+  if (cnt > 10) {
+    fnet_close(ev->connection);
+    exit(0);
+  }
 }
 
 int main(int argc, const char *argv[]) {
-  int i, n;
+  int i, n, cnt = 0;
 
   const char *addr = "127.0.0.1";
   uint16_t port    = 1337;
@@ -117,7 +126,7 @@ int main(int argc, const char *argv[]) {
       .onData    = onData,
       .onTick    = onTick,
       .onClose   = onClose,
-      .udata     = NULL,
+      .udata     = &cnt,
     }));
     fnet_main();
     return 0;
