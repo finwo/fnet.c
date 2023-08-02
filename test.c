@@ -92,6 +92,7 @@ int main(int argc, const char *argv[]) {
 
   printf("Address: %s\n", addr);
   printf("Port   : %d\n", port);
+  printf("Mode   : %s\n", (mode == 1 ? "Listen" : (mode == 2 ? "Connect" : "Unknown")));
 
 
   if (mode == 1) {

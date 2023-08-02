@@ -14,6 +14,7 @@ extern "C" {
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
+#include <sys/epoll.h>
 
 #include "tidwall/buf.h"
 
@@ -23,14 +24,16 @@ extern "C" {
 
 struct fnet_internal_t {
   struct fnet_t ext; // KEEP AT TOP, allows casting between fnet_internal_t* and fnet_t*
-  void          *prev;
-  void          *next;
-  FNET_SOCKET   *fds;
-  int           nfds;
-  FNET_FLAG     flags;
+  void               *prev;
+  void               *next;
+  FNET_SOCKET        *fds;
+  int                nfds;
+  struct epoll_event **epev;
+  FNET_FLAG          flags;
 };
 
 struct fnet_internal_t *connections = NULL;
+int                    epfd         = 0;
 
 int setkeepalive(int fd) {
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &(int){1}, sizeof(int))) {
@@ -66,11 +69,13 @@ int setnonblock(int fd) {
 int64_t _fnet_now() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
-  return (tv.tv_sec * ((int64_t)1000000)) + tv.tv_usec;
+  return (tv.tv_sec * ((int64_t)1000)) + (tv.tv_usec / 1000);
 }
 
 // CAUTION: assumes options have been vetted
 struct fnet_internal_t * _fnet_init(const struct fnet_options_t *options) {
+  if (!epfd) epfd = epoll_create1(0);
+
   // 1-to-1 copy, don't touch the options
   struct fnet_internal_t *conn = malloc(sizeof(struct fnet_internal_t));
   conn->ext.proto     = options->proto;
@@ -83,6 +88,7 @@ struct fnet_internal_t * _fnet_init(const struct fnet_options_t *options) {
   conn->ext.onClose   = options->onClose;
   conn->nfds          = 0;
   conn->fds           = NULL;
+  conn->epev          = NULL;
 
   // Aanndd add to the connection tracking list
   conn->next = connections;
@@ -159,6 +165,15 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
     return NULL;
   }
 
+  conn->epev = calloc(naddrs, sizeof(struct epoll_event *));
+  if (!conn->epev) {
+    fprintf(stderr, "%s\n", strerror(ENOMEM));
+    fnet_free((struct fnet_t *)conn);
+    freeaddrinfo(addrs);
+    return NULL;
+  }
+
+  struct epoll_event *epev;
   addrinfo = addrs;
   for (; addrinfo ; addrinfo = addrinfo->ai_next ) {
 
@@ -200,6 +215,21 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
 
     conn->fds[conn->nfds] = fd;
     conn->nfds++;
+
+    if (epfd) {
+      epev = malloc(sizeof(struct epoll_event));
+      if (!epev) continue;
+
+      epev->events   = EPOLLIN;
+      epev->data.ptr = conn;
+      if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, epev)) {
+        free(epev);
+        continue;
+      }
+
+      printf("Listen socket added to epfd\n");
+      conn->epev[conn->nfds - 1] = epev;
+    }
   }
 
   freeaddrinfo(addrs);
@@ -271,8 +301,17 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
     return NULL;
   }
 
+  conn->epev = calloc(1, sizeof(struct epoll_event *));
+  if (!conn->epev) {
+    fprintf(stderr, "%s\n", strerror(ENOMEM));
+    fnet_free((struct fnet_t *)conn);
+    freeaddrinfo(addrs);
+    return NULL;
+  }
+
   fprintf(stderr, "Addresses: %d\n", naddrs);
 
+  struct epoll_event *epev;
   addrinfo = addrs;
   for (; addrinfo ; addrinfo = addrinfo->ai_next ) {
 
@@ -301,6 +340,20 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
     conn->fds[conn->nfds] = fd;
     conn->nfds++;
 
+    if (epfd) {
+      epev = malloc(sizeof(struct epoll_event));
+      if (!epev) break;
+
+      epev->events   = EPOLLIN;
+      epev->data.ptr = conn;
+      if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, epev)) {
+        free(epev);
+        break;
+      }
+
+      conn->epev[conn->nfds - 1] = epev;
+    }
+
     // Only need 1 connection
     break;
   }
@@ -326,6 +379,7 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);
   struct buf *rbuf = NULL;
+  struct epoll_event *epev;
 
   // Checking arguments are given
   if (!conn) {
@@ -409,6 +463,7 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
       }));
 
       nconn->fds        = malloc(sizeof(FNET_SOCKET));
+      nconn->epev       = calloc(1, sizeof(struct epoll_event *));
       nconn->fds[0]     = nfd;
       nconn->nfds       = 1;
       nconn->ext.status = FNET_STATUS_CONNECTED | FNET_STATUS_ACCEPTED;
@@ -420,6 +475,20 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
           .buffer     = NULL,
           .udata      = conn->ext.udata,
         }));
+      }
+
+      if (epfd) {
+        epev = malloc(sizeof(struct epoll_event));
+        if (!epev) continue;
+
+        epev->events   = EPOLLIN;
+        epev->data.ptr = nconn;
+        if (epoll_ctl(epfd, EPOLL_CTL_ADD, nfd, epev)) {
+          free(epev);
+          continue;
+        }
+
+        nconn->epev[0] = epev;
       }
     }
 
@@ -490,13 +559,16 @@ FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
     return FNET_RETURNCODE_MISSING_ARGUMENT;
   }
 
-  if (conn->fds) {
+  if (conn->nfds) {
     for ( i = 0 ; i < conn->nfds ; i++ ) {
+      if ((epfd) && (conn->epev[i])) epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fds[i], conn->epev[i]);
       close(conn->fds[i]);
     }
     conn->nfds = 0;
     free(conn->fds);
+    free(conn->epev);
     conn->fds = NULL;
+    conn->epev = NULL;
   }
 
   if (conn->ext.onClose) {
@@ -532,18 +604,21 @@ FNET_RETURNCODE fnet_free(struct fnet_t *connection) {
   fnet_close(conn);
 
   if (conn->fds) free(conn->fds);
+  if (conn->epev) free(conn->epev);
 
   free(conn);
 
   return FNET_RETURNCODE_OK;
 }
 
-FNET_RETURNCODE fnet_tick() {
+FNET_RETURNCODE fnet_tick(int doProcess) {
   struct fnet_internal_t *conn = connections;
   FNET_RETURNCODE ret;
   while(conn) {
-    ret = fnet_process((struct fnet_t *)conn);
-    if (ret < 0) return ret;
+    if (doProcess) {
+      ret = fnet_process((struct fnet_t *)conn);
+      if (ret < 0) return ret;
+    }
     if (conn->ext.onTick) {
       conn->ext.onTick(&((struct fnet_ev){
         .connection = (struct fnet_t *)conn,
@@ -560,22 +635,40 @@ FNET_RETURNCODE fnet_tick() {
 FNET_RETURNCODE fnet_main() {
   FNET_RETURNCODE ret;
   int64_t         ttime = _fnet_now();
-  int64_t         tdiff;
+  int64_t         tdiff = 0;
+  int             ev_count;
+  int             i;
+
+  struct epoll_event events[8];
 
   while(1) {
-    // TODO: handle kill signal?
-    // TODO: dynamic sleep to have 10ms - 100ms tick?
-    ret   = fnet_tick();
-    if (ret) return ret;
 
-    // Sleep 10ms to lower cpu consumption
-    ttime = ttime + 10000;
-    tdiff = ttime - _fnet_now();
-    if (tdiff <= 0) {
-      ttime = 10 + ttime - tdiff;
-      tdiff = 10;
+    // Do the actual processing
+    if (epfd) {
+      ev_count = epoll_wait(epfd, events, 8, tdiff);
+      for( i = 0 ; i < ev_count ; i++ ) {
+        ret = fnet_process((struct fnet_t *)events[i].data.ptr);
+        if (ret) return ret;
+      }
+    } else {
+      fnet_tick(1);
     }
-    usleep(tdiff);
+
+    // Tick timing
+    tdiff = ttime - _fnet_now();
+    if (epfd && (tdiff < 0)) {
+      ttime += 1000;
+      tdiff += 1000;
+      fnet_tick(0);
+    }
+
+    // Sleep if no epoll
+    if (!epfd) {
+      printf("No poll, do tick\n");
+      ttime += 1000;
+      usleep(tdiff * 1000);
+    }
+
   }
 
   // TODO: is this really ok?
