@@ -30,7 +30,7 @@ void onTick(struct fnet_ev *ev) {
   int cnt = *((int*)ev->udata);
 
   fnet_write(ev->connection, &((struct buf){
-    .len  = strlen(data),
+    .len  = strlen(data) + 1,
     .data = data,
   }));
 

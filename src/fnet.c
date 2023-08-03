@@ -227,7 +227,7 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
         continue;
       }
 
-      printf("Listen socket added to epfd\n");
+      /* printf("Listen socket added to epfd\n"); */
       conn->epev[conn->nfds - 1] = epev;
     }
   }
@@ -309,7 +309,7 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
     return NULL;
   }
 
-  fprintf(stderr, "Addresses: %d\n", naddrs);
+  /* fprintf(stderr, "Addresses: %d\n", naddrs); */
 
   struct epoll_event *epev;
   addrinfo = addrs;
@@ -664,7 +664,7 @@ FNET_RETURNCODE fnet_main() {
 
     // Sleep if no epoll
     if (!epfd) {
-      printf("No poll, do tick\n");
+      /* printf("No poll, do tick\n"); */
       ttime += 1000;
       usleep(tdiff * 1000);
     }
