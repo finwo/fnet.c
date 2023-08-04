@@ -34,10 +34,11 @@ extern "C" {
 #define FNET_STATUS_CLOSED        32
 
 #define FNET_EVENT         int
-#define FNET_EVENT_CONNECT 1
-#define FNET_EVENT_DATA    2
-#define FNET_EVENT_TICK    3
-#define FNET_EVENT_CLOSE   4
+#define FNET_EVENT_LISTEN  1
+#define FNET_EVENT_CONNECT 2
+#define FNET_EVENT_DATA    3
+#define FNET_EVENT_TICK    4
+#define FNET_EVENT_CLOSE   5
 
 #define FNET_CALLBACK(NAME) void (*(NAME))(struct fnet_ev *event)
 
@@ -51,6 +52,7 @@ struct fnet_ev {
 struct fnet_t {
   FNET_PROTOCOL proto;
   FNET_STATUS   status;
+  FNET_CALLBACK(onListen);
   FNET_CALLBACK(onConnect);
   FNET_CALLBACK(onData);
   FNET_CALLBACK(onTick);
@@ -61,6 +63,7 @@ struct fnet_t {
 struct fnet_options_t {
   FNET_PROTOCOL proto;
   FNET_FLAG     flags;
+  FNET_CALLBACK(onListen);
   FNET_CALLBACK(onConnect);
   FNET_CALLBACK(onData);
   FNET_CALLBACK(onTick);

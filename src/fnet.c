@@ -82,6 +82,7 @@ struct fnet_internal_t * _fnet_init(const struct fnet_options_t *options) {
   conn->ext.status    = FNET_STATUS_INITIALIZING;
   conn->ext.udata     = options->udata;
   conn->flags         = options->flags;
+  conn->ext.onListen  = options->onListen;
   conn->ext.onConnect = options->onConnect;
   conn->ext.onData    = options->onData;
   conn->ext.onTick    = options->onTick;
@@ -230,6 +231,15 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
       /* printf("Listen socket added to epfd\n"); */
       conn->epev[conn->nfds - 1] = epev;
     }
+  }
+
+  if (conn->ext.onListen) {
+    conn->ext.onConnect(&((struct fnet_ev){
+      .connection = (struct fnet_t *)conn,
+      .type       = FNET_EVENT_LISTEN,
+      .buffer     = NULL,
+      .udata      = conn->ext.udata,
+    }));
   }
 
   freeaddrinfo(addrs);
@@ -455,6 +465,7 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
       nconn = _fnet_init(&((struct fnet_options_t){
         .proto     = conn->ext.proto,
         .flags     = conn->flags & (~FNET_FLAG_RECONNECT),
+        .onListen  = NULL,
         .onConnect = NULL,
         .onData    = NULL,
         .onTick    = NULL,
