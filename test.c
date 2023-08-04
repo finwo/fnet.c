@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -10,7 +11,7 @@ void onClose(struct fnet_ev *ev) {
 }
 
 void onData(struct fnet_ev *ev) {
-  printf("Data(%d): %.*s\n", ev->buffer->len, (int)(ev->buffer->len), ev->buffer->data);
+  printf("Data(%ld): %.*s\n", ev->buffer->len, (int)(ev->buffer->len), ev->buffer->data);
 
   // Simple echo if it was an accepted connection
   if (ev->connection->status & FNET_STATUS_ACCEPTED) {
@@ -26,7 +27,7 @@ void onConnect(struct fnet_ev *ev) {
 }
 
 void onTick(struct fnet_ev *ev) {
-  const char *data = "Hello world!";
+  char *data = "Hello world!";
   int cnt = *((int*)ev->udata);
 
   fnet_write(ev->connection, &((struct buf){

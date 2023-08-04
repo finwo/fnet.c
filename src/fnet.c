@@ -368,7 +368,7 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
   }
 
   conn->ext.status = FNET_STATUS_CONNECTED;
-  return conn;
+  return (struct fnet_t *)conn;
 }
 
 FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
@@ -412,7 +412,7 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
       }
       rbuf->len = n;
       if (rbuf->len == 0) {
-        fnet_close(conn);
+        fnet_close((struct fnet_t *)conn);
         break;
       }
       if (conn->ext.onData) {
@@ -601,7 +601,7 @@ FNET_RETURNCODE fnet_free(struct fnet_t *connection) {
   if (conn->prev) ((struct fnet_internal_t *)(conn->prev))->next = conn->next;
   if (conn == connections) connections = conn->next;
 
-  fnet_close(conn);
+  fnet_close((struct fnet_t *)conn);
 
   if (conn->fds) free(conn->fds);
   if (conn->epev) free(conn->epev);
