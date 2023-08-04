@@ -234,7 +234,7 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
   }
 
   if (conn->ext.onListen) {
-    conn->ext.onConnect(&((struct fnet_ev){
+    conn->ext.onListen(&((struct fnet_ev){
       .connection = (struct fnet_t *)conn,
       .type       = FNET_EVENT_LISTEN,
       .buffer     = NULL,
