@@ -201,14 +201,14 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
     }
 
     if (bind(fd, addrinfo->ai_addr, addrinfo->ai_addrlen) < 0) {
-      fprintf(stderr, "bind\n");
+      fprintf(stderr, "bind: %s\n", strerror(errno));
       fnet_free((struct fnet_t *)conn);
       freeaddrinfo(addrs);
       return NULL;
     }
 
     if (listen(fd, SOMAXCONN) < 0) {
-      fprintf(stderr, "bind\n");
+      fprintf(stderr, "listen: %s\n", strerror(errno));
       fnet_free((struct fnet_t *)conn);
       freeaddrinfo(addrs);
       return NULL;
