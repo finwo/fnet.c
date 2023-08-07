@@ -667,7 +667,7 @@ FNET_RETURNCODE fnet_main() {
 
     // Tick timing
     tdiff = ttime - _fnet_now();
-    if (epfd && (tdiff < 0)) {
+    if (epfd && (tdiff <= 0)) {
       ttime += 1000;
       tdiff += 1000;
       fnet_tick(0);
