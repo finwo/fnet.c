@@ -378,6 +378,16 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
   }
 
   conn->ext.status = FNET_STATUS_CONNECTED;
+
+  if (conn->ext.onConnect) {
+    conn->ext.onConnect(&((struct fnet_ev){
+      .connection = (struct fnet_t *)conn,
+      .type       = FNET_EVENT_CONNECT,
+      .buffer     = NULL,
+      .udata      = conn->ext.udata,
+    }));
+  }
+
   return (struct fnet_t *)conn;
 }
 
