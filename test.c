@@ -48,7 +48,7 @@ int main(int argc, const char *argv[]) {
 
   const char *addr = "127.0.0.1";
   uint16_t port    = 1337;
-  int mode         = 1; // 1 = listen, 2 = connect
+  int mode         = 3; // 1 = listen, 2 = connect
 
   for( i = 0 ; i < argc ; i++ ) {
 
