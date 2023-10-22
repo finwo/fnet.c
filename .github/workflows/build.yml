@@ -8,48 +8,39 @@ on:
 
 jobs:
 
-  # build-windows:
-  #   name: Build
-  #   runs-on: ${{ matrix.os }}
-  #   strategy:
-  #     matrix:
-  #       include:
-  #         - os: windows-latest
-  #           cc: clang
-  #   steps:
-  #     - uses: actions/checkout@v3
+  build-windows:
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            cc: clang
+    steps:
+      - uses: actions/checkout@v3
 
-  #     - name: Install dependencies (windows)
-  #       run: |
-  #         mkdir external
-  #         mkdir external\\tools
-  #         mkdir external\\libs
-  #         curl -sSLo "external\\tools\\nuget.exe" https://dist.nuget.org/win-x86-commandline/latest/nuget.exe
-  #         external\\tools\\nuget install Microsoft.Web.Webview2 -Verbosity quiet -Version "1.0.1150.38" -OutputDirectory "external\\libs" || exit /b 1
+      # - name: Install dependencies (windows)
+      #   run: |
+      #     mkdir external
+      #     mkdir external\\tools
+      #     mkdir external\\libs
+      #     curl -sSLo "external\\tools\\nuget.exe" https://dist.nuget.org/win-x86-commandline/latest/nuget.exe
+      #     external\\tools\\nuget install Microsoft.Web.Webview2 -Verbosity quiet -Version "1.0.1150.38" -OutputDirectory "external\\libs" || exit /b 1
 
-  #     - shell: bash
-  #       run: |
-  #         echo "/c/msys64/mingw64/bin" >> $GITHUB_PATH
+      - shell: bash
+        run: |
+          echo "/c/msys64/mingw64/bin" >> $GITHUB_PATH
 
-  #     - uses: finwo/dep@main
-  #       name: Install dep
+      - uses: finwo/dep@main
+        name: Install dep
 
-  #     - name: Install dependencies
-  #       run: dep install
-  #       shell: bash
+      - name: Install dependencies
+        run: dep install
+        shell: bash
 
-  #     - name: Build
-  #       run: make CC=${{ matrix.cc }} CPP=${{ matrix.cpp }} BIN=${{ matrix.bin }}
-  #       shell: bash
-
-  #     - name: Upload binaries to release
-  #       uses: svenstaro/upload-release-action@v2
-  #       with:
-  #         repo_token: ${{ secrets.GITHUB_TOKEN }}
-  #         file: ${{ matrix.bin }}
-  #         file_glob: true
-  #         overwrite: true
-  #         tag: ${{ github.ref }}
+      - name: Build
+        run: make CC=${{ matrix.cc }}
+        shell: bash
 
   build-linux:
     name: Build
