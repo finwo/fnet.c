@@ -6,19 +6,20 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/timeb.h>
 
 #include <fcntl.h>
 #include <sys/types.h>
-#include <netinet/tcp.h>
 #include <sys/epoll.h>
 
 #ifdef _WIN32
+#include <sys/timeb.h>
 #include <winsock2.h>
 #include <Ws2tcpip.h>
 #else
 #include <netdb.h>
+#include <netinet/tcp.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 #endif
 
@@ -73,9 +74,15 @@ int setnonblock(int fd) {
 }
 
 int64_t _fnet_now() {
-  struct timeb tb;
-  ftime(&tb);
-  return (1000 * (int64_t)tb.time) + tb.millitm;
+#if defined(_WIN32) || defined(_WIN64)
+  struct _timeb timebuffer;
+  _ftime(&timebuffer);
+  return (int64_t)(((timebuffer.time * 1000) + timebuffer.millitm));
+#else
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (tv.tv_sec * ((int64_t)1000)) + (tv.tv_usec / 1000);
+#endif
 }
 
 // CAUTION: assumes options have been vetted
