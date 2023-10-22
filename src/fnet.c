@@ -9,15 +9,16 @@ extern "C" {
 
 #include <fcntl.h>
 #include <sys/types.h>
-#include <sys/epoll.h>
 
 #ifdef _WIN32
+#include "piscisaureus/wepoll.h"
 #include <sys/timeb.h>
 #include <winsock2.h>
 #include <Ws2tcpip.h>
 #else
 #include <netdb.h>
 #include <netinet/tcp.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
