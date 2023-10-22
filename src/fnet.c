@@ -43,35 +43,41 @@ struct fnet_internal_t {
 struct fnet_internal_t *connections = NULL;
 int                    epfd         = 0;
 
-int setkeepalive(int fd) {
+FNET_RETURNCODE setkeepalive(FNET_SOCKET fd) {
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &(int){1}, sizeof(int))) {
         return -1;
     }
 #if defined(__linux__)
     // tcp_keepalive_time
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &(int){600}, sizeof(int))) {
-        return -1;
+        return FNET_RETURNCODE_ERROR;
     }
     // tcp_keepalive_intvl
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &(int){60}, sizeof(int))) {
-        return -1;
+        return FNET_RETURNCODE_ERROR;
     }
     // tcp_keepalive_probes
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &(int){6}, sizeof(int))) {
-        return -1;
+        return FNET_RETURNCODE_ERROR;
     }
 #endif
-    return 0;
+    return FNET_RETURNCODE_OK;
 }
 
-int settcpnodelay(int fd) {
-  return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &(int){1}, sizeof(int));
+FNET_RETURNCODE settcpnodelay(FNET_SOCKET fd) {
+  if(setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &(int){1}, sizeof(int))) {
+    return FNET_RETURNCODE_ERROR;
+  }
+  return FNET_RETURNCODE_OK;
 }
 
-int setnonblock(int fd) {
+FNET_RETURNCODE setnonblock(FNET_SOCKET fd) {
   int flags = fcntl(fd, F_GETFL, 0);
   if (flags < 0) return flags;
-  return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+  if(fcntl(fd, F_SETFL, flags | O_NONBLOCK)) {
+    return FNET_RETURNCODE_ERROR;
+  }
+  return FNET_RETURNCODE_OK;
 }
 
 int64_t _fnet_now() {
@@ -192,7 +198,7 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
   addrinfo = addrs;
   for (; addrinfo ; addrinfo = addrinfo->ai_next ) {
 
-    int fd = socket(addrinfo->ai_family, addrinfo->ai_socktype, addrinfo->ai_protocol);
+    FNET_SOCKET fd = socket(addrinfo->ai_family, addrinfo->ai_socktype, addrinfo->ai_protocol);
     if (fd < 0) {
       fprintf(stderr, "socket\n");
       fnet_free((struct fnet_t *)conn);
@@ -339,7 +345,7 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
   addrinfo = addrs;
   for (; addrinfo ; addrinfo = addrinfo->ai_next ) {
 
-    int fd = socket(addrinfo->ai_family, addrinfo->ai_socktype, addrinfo->ai_protocol);
+    FNET_SOCKET fd = socket(addrinfo->ai_family, addrinfo->ai_socktype, addrinfo->ai_protocol);
     if (fd < 0) {
       fprintf(stderr, "socket\n");
       fnet_free((struct fnet_t *)conn);
