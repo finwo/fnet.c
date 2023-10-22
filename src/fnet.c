@@ -76,12 +76,22 @@ FNET_RETURNCODE settcpnodelay(FNET_SOCKET fd) {
 }
 
 FNET_RETURNCODE setnonblock(FNET_SOCKET fd) {
+  if (fd < 0) return FNET_RETURNCODE_ERROR;
+#if defined(_WIN32) || defined(_WIN64)
+  unsigned long mode = 1;
+  if (ioctlsocket(fd, FIONBIO, &mode) == 0) {
+    return FNET_RETURNCODE_OK;
+  } else {
+    return FNET_RETURNCODE_ERROR;
+  }
+#else
   int flags = fcntl(fd, F_GETFL, 0);
   if (flags < 0) return flags;
   if(fcntl(fd, F_SETFL, flags | O_NONBLOCK)) {
     return FNET_RETURNCODE_ERROR;
   }
   return FNET_RETURNCODE_OK;
+#endif
 }
 
 int64_t _fnet_now() {
