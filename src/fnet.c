@@ -10,7 +10,7 @@ extern "C" {
 #include <fcntl.h>
 #include <sys/types.h>
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(_WIN64)
 #include "piscisaureus/wepoll.h"
 #include <sys/timeb.h>
 #include <winsock2.h>
@@ -28,7 +28,11 @@ extern "C" {
 
 #include "fnet.h"
 
+#if defined(_WIN32) || defined(_WIN64)
+#define FNET_SOCKET unsigned int
+#else
 #define FNET_SOCKET int
+#endif
 
 struct fnet_internal_t {
   struct fnet_t ext; // KEEP AT TOP, allows casting between fnet_internal_t* and fnet_t*
