@@ -6,15 +6,21 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/time.h>
 
 #include <fcntl.h>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
 #include <netinet/tcp.h>
 #include <sys/epoll.h>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <Ws2tcpip.h>
+#else
+#include <netdb.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
 
 #include "tidwall/buf.h"
 
