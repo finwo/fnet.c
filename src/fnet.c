@@ -6,7 +6,7 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
+#include <sys/timeb.h>
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -73,9 +73,9 @@ int setnonblock(int fd) {
 }
 
 int64_t _fnet_now() {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return (tv.tv_sec * ((int64_t)1000)) + (tv.tv_usec / 1000);
+  struct timeb tb;
+  ftime(&tb);
+  return (1000 * (int64_t)tb.time) + tb.millitm;
 }
 
 // CAUTION: assumes options have been vetted
