@@ -11,19 +11,18 @@ extern "C" {
 #include <sys/types.h>
 
 #if defined(_WIN32) || defined(_WIN64)
-#include "piscisaureus/wepoll.h"
 #include <sys/timeb.h>
 #include <winsock2.h>
 #include <Ws2tcpip.h>
 #else
 #include <netdb.h>
 #include <netinet/tcp.h>
-#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
 #endif
 
+#include "piscisaureus/wepoll.h"
 #include "tidwall/buf.h"
 
 #include "fnet.h"
@@ -45,7 +44,7 @@ struct fnet_internal_t {
 };
 
 struct fnet_internal_t *connections = NULL;
-int                    epfd         = 0;
+EPOLL_HANDLE           epfd         = 0;
 
 FNET_RETURNCODE setkeepalive(FNET_SOCKET fd) {
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &(int){1}, sizeof(int))) {
