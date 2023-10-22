@@ -3,8 +3,8 @@
 name: Build
 on:
   push:
-    # tags:
-    #   - '*'
+    tags:
+      - '*'
 
 jobs:
 
@@ -16,6 +16,7 @@ jobs:
         include:
           - os: windows-latest
             cc: clang
+            bin: fnet_test.exe
     steps:
       - uses: actions/checkout@v3
 
@@ -39,8 +40,17 @@ jobs:
         shell: bash
 
       - name: Build
-        run: make CC=${{ matrix.cc }}
+        run: make CC=${{ matrix.cc }} BIN=${{ matrix.bin }}
         shell: bash
+
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ matrix.bin }}
+          file_glob: true
+          overwrite: true
+          tag: ${{ github.ref }}
 
   build-linux:
     name: Build

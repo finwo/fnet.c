@@ -1,7 +1,7 @@
 LIBS:=
 SRC:=
 
-BIN=fnet_test
+BIN?=fnet_test
 SRC+=test.c
 
 SRC+=$(wildcard src/*.c)
