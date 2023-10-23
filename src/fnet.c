@@ -456,7 +456,7 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
     rbuf->data = malloc(BUFSIZ);
     rbuf->cap  = BUFSIZ;
     for ( i = 0 ; i < conn->nfds ; i++ ) {
-      n = read(conn->fds[i], rbuf->data, rbuf->cap);
+      n = recv(conn->fds[i], rbuf->data, rbuf->cap, 0);
       if (n < 0) {
         if (errno == EAGAIN) continue;
         buf_clear(rbuf);
