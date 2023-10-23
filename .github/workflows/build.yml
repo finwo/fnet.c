@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            cc: clang
+            cc: cl
             bin: fnet_test.exe
     steps:
       - uses: actions/checkout@v3
