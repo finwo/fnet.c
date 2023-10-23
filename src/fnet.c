@@ -732,7 +732,11 @@ FNET_RETURNCODE fnet_main() {
     if (!epfd) {
       /* printf("No poll, do tick\n"); */
       ttime += 1000;
+#if defined(_WIN32) || defined(_WIN64)
+      Sleep(tdiff);
+#else
       usleep(tdiff * 1000);
+#endif
     }
 
   }
