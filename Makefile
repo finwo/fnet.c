@@ -53,6 +53,9 @@ OBJ:=$(OBJ:.cc=.o)
 
 override CFLAGS+=$(INCLUDES)
 
+LDFLAGS?=
+LDFLAGS+=$(CFLAGS)
+
 default: $(BIN)
 
 $(OBJ): $(SRC)
