@@ -1,10 +1,6 @@
 #ifndef __INCLUDE_FINWO_FNET_H__
 #define __INCLUDE_FINWO_FNET_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdint.h>
 
 #include "tidwall/buf.h"
@@ -81,9 +77,5 @@ FNET_RETURNCODE fnet_free(struct fnet_t *connection);
 
 FNET_RETURNCODE fnet_tick();
 FNET_RETURNCODE fnet_main();
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif // __INCLUDE_FINWO_FNET_H__

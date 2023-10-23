@@ -1,7 +1,3 @@
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -744,7 +740,3 @@ FNET_RETURNCODE fnet_main() {
   // TODO: is this really ok?
   return FNET_RETURNCODE_OK;
 }
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
