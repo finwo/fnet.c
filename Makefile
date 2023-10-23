@@ -7,7 +7,7 @@ SRC+=test.c
 SRC+=$(wildcard src/*.c)
 SRC+=$(wildcard src/*/*.c)
 
-override CFLAGS?=-Wall -s -O2
+override CFLAGS?=-Wall -O2
 
 INCLUDES:=
 INCLUDES+=-I src
@@ -53,7 +53,7 @@ OBJ:=$(OBJ:.cc=.o)
 
 override CFLAGS+=$(INCLUDES)
 
-LDFLAGS?=
+LDFLAGS?=-s
 LDFLAGS+=$(CFLAGS)
 
 default: $(BIN)
