@@ -20,13 +20,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install dependencies (windows)
-        run: |
-          mkdir external
-          mkdir external\\tools
-          mkdir external\\libs
-          curl -sSLo "external\\tools\\nuget.exe" https://dist.nuget.org/win-x86-commandline/latest/nuget.exe
-          external\\tools\\nuget install Vanara.PInvoke.Ws2_32 -Verbosity quiet -Version "3.4.17" -OutputDirectory "external\\libs" || exit /b 1
+      # - name: Install dependencies (windows)
+      #   run: |
+      #     mkdir external
+      #     mkdir external\\tools
+      #     mkdir external\\libs
+      #     curl -sSLo "external\\tools\\nuget.exe" https://dist.nuget.org/win-x86-commandline/latest/nuget.exe
+      #     external\\tools\\nuget install Vanara.PInvoke.Ws2_32 -Verbosity quiet -Version "3.4.17" -OutputDirectory "external\\libs" || exit /b 1
 
       - shell: bash
         run: |
