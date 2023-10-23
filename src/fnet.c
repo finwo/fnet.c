@@ -25,6 +25,7 @@
 
 #if defined(_WIN32) || defined(_WIN64)
 #define FNET_SOCKET unsigned int
+#pragma comment(lib,"Ws2_32.lib")
 #else
 #define FNET_SOCKET int
 #endif
