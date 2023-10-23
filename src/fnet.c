@@ -368,12 +368,20 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
 
     // Skip found address on failure to connect
     if (connect(fd, addrinfo->ai_addr, sizeof(struct sockaddr))) {
+#if defined(_WIN32) || defined(_WIN64)
+      closesocket(fd);
+#else
       close(fd);
+#endif
       continue;
     }
 
     if (setnonblock(fd) < 0) {
+#if defined(_WIN32) || defined(_WIN64)
+      closesocket(fd);
+#else
       close(fd);
+#endif
       fprintf(stderr, "setnonblock\n");
       fnet_free((struct fnet_t *)conn);
       freeaddrinfo(addrs);
