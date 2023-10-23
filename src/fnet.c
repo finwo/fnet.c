@@ -585,7 +585,7 @@ FNET_RETURNCODE fnet_write(const struct fnet_t *connection, struct buf *buf) {
   int n = 0;
   ssize_t r;
   while(n < buf->len) {
-    r = write(conn->fds[0], &(buf->data[n]), buf->len - n);
+    r = send(conn->fds[0], &(buf->data[n]), buf->len - n, 0);
     // Handle errors
     if (r < 0) {
       if (errno == EAGAIN) {
