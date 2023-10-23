@@ -616,7 +616,11 @@ FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
   if (conn->nfds) {
     for ( i = 0 ; i < conn->nfds ; i++ ) {
       if ((epfd) && (conn->epev[i])) epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fds[i], conn->epev[i]);
+#if defined(_WIN32) || defined(_WIN64)
+      closesocket(conn->fds[i]);
+#else
       close(conn->fds[i]);
+#endif
     }
     conn->nfds = 0;
     free(conn->fds);
