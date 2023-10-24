@@ -14,7 +14,6 @@ INCLUDES+=-I src
 
 ifeq ($(OS),Windows_NT)
     # CFLAGS += -D WIN32
-    # override CFLAGS+=-I external/libs/Vanara.PInvoke.Ws2_32.3.4.17/build/native/include
     ifeq ($(PROCESSOR_ARCHITEW6432),AMD64)
         # CFLAGS += -D AMD64
     else
@@ -29,7 +28,6 @@ else
     UNAME_S := $(shell uname -s)
     ifeq ($(UNAME_S),Linux)
         # CFLAGS += -D LINUX
-        # override CFLAGS+=$(shell pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.0 glib-2.0)
     endif
     ifeq ($(UNAME_S),Darwin)
         # CFLAGS += -D OSX
