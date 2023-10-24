@@ -30,8 +30,6 @@
 #define FNET_SOCKET int
 #endif
 
-int fnet_keepRunning = 1;
-
 struct fnet_internal_t {
   struct fnet_t ext; // KEEP AT TOP, allows casting between fnet_internal_t* and fnet_t*
   void               *prev;
@@ -706,7 +704,7 @@ FNET_RETURNCODE fnet_main() {
 
   struct epoll_event events[8];
 
-  while(fnet_keepRunning) {
+  while(1) {
 
     // Do the actual processing
     if (epfd) {

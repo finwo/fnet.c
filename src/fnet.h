@@ -38,8 +38,6 @@
 
 #define FNET_CALLBACK(NAME) void (*(NAME))(struct fnet_ev *event)
 
-extern int fnet_keepRunning;
-
 struct fnet_ev {
   struct fnet_t *connection;
   FNET_EVENT     type;
