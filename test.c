@@ -11,6 +11,8 @@
 
 #include "fnet.h"
 
+int ticked = 0;
+
 void onClose(struct fnet_ev *ev) {
   printf("Connection closed!\n");
 }
@@ -34,6 +36,13 @@ void onConnect(struct fnet_ev *ev) {
 void onTick(struct fnet_ev *ev) {
   char *data = "Hello world!";
   int cnt = *((int*)ev->udata);
+
+  // Limit to 4
+  ticked++;
+  if (ticked > 4) {
+    fnet_keepRunning = 0;
+    return;
+  }
 
   fnet_write(ev->connection, &((struct buf){
     .len  = strlen(data) + 1,
