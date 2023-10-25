@@ -634,6 +634,8 @@ FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
     conn->epev = NULL;
   }
 
+  conn->ext.status = FNET_STATUS_CLOSED;
+
   if (conn->ext.onClose) {
     conn->ext.onClose(&((struct fnet_ev){
       .connection = (struct fnet_t *)conn,
@@ -644,8 +646,6 @@ FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
 
     conn->ext.onClose = NULL;
   }
-
-  // TODO: set closed flag
 
   return FNET_RETURNCODE_OK;
 }
