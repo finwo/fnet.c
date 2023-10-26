@@ -697,6 +697,10 @@ FNET_RETURNCODE fnet_tick(int doProcess) {
   return FNET_RETURNCODE_OK;
 }
 
+void fnet_thread() {
+  fnet_main();
+}
+
 FNET_RETURNCODE fnet_main() {
   FNET_RETURNCODE ret;
   int64_t         ttime = _fnet_now();
