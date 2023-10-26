@@ -743,15 +743,13 @@ FNET_RETURNCODE fnet_main() {
       usleep(tdiff * 1000);
 #endif
     }
-
   }
-
-  while(connections) fnet_free(connections);
 
   return FNET_RETURNCODE_OK;
 }
 
 FNET_RETURNCODE fnet_shutdown() {
   runners = 0;
+  while(connections) fnet_free(connections);
   return FNET_RETURNCODE_OK;
 }
