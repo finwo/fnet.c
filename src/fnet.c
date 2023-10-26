@@ -750,6 +750,6 @@ FNET_RETURNCODE fnet_main() {
 
 FNET_RETURNCODE fnet_shutdown() {
   runners = 0;
-  while(connections) fnet_free(connections);
+  while(connections) fnet_free((struct fnet_t *)connections);
   return FNET_RETURNCODE_OK;
 }
