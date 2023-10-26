@@ -43,7 +43,7 @@ struct fnet_internal_t {
 
 struct fnet_internal_t *connections = NULL;
 EPOLL_HANDLE           epfd         = 0;
-bool                   keepRunning  = true;
+int                    runners      = 0;
 
 FNET_RETURNCODE setkeepalive(FNET_SOCKET fd) {
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &(int){1}, sizeof(int))) {
@@ -704,9 +704,15 @@ FNET_RETURNCODE fnet_main() {
   int             ev_count;
   int             i;
 
+  if (runners) {
+    return FNET_RETURNCODE_ALREADY_ACTIVE;
+  }
+
+  runners++;
+
   struct epoll_event events[8];
 
-  while(keepRunning) {
+  while(runners) {
 
     // Do the actual processing
     if (epfd) {
@@ -740,11 +746,10 @@ FNET_RETURNCODE fnet_main() {
 
   }
 
-  // TODO: is this really ok?
   return FNET_RETURNCODE_OK;
 }
 
 FNET_RETURNCODE fnet_shutdown() {
-  keepRunning = false;
+  runners = 0;
   return FNET_RETURNCODE_OK;
 }
