@@ -15,6 +15,7 @@ int ticked = 0;
 
 void onClose(struct fnet_ev *ev) {
   printf("Connection closed!\n");
+  fnet_shutdown();
 }
 
 void onData(struct fnet_ev *ev) {

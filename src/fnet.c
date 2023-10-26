@@ -746,6 +746,8 @@ FNET_RETURNCODE fnet_main() {
 
   }
 
+  while(connections) fnet_free(connections);
+
   return FNET_RETURNCODE_OK;
 }
 
