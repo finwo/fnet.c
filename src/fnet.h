@@ -77,5 +77,6 @@ FNET_RETURNCODE fnet_free(struct fnet_t *connection);
 
 FNET_RETURNCODE fnet_tick();
 FNET_RETURNCODE fnet_main();
+FNET_RETURNCODE fnet_shutdown();
 
 #endif // __INCLUDE_FINWO_FNET_H__

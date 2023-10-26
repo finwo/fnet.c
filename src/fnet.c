@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +43,7 @@ struct fnet_internal_t {
 
 struct fnet_internal_t *connections = NULL;
 EPOLL_HANDLE           epfd         = 0;
+bool                   keepRunning  = true;
 
 FNET_RETURNCODE setkeepalive(FNET_SOCKET fd) {
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &(int){1}, sizeof(int))) {
@@ -704,7 +706,7 @@ FNET_RETURNCODE fnet_main() {
 
   struct epoll_event events[8];
 
-  while(1) {
+  while(keepRunning) {
 
     // Do the actual processing
     if (epfd) {
@@ -739,5 +741,10 @@ FNET_RETURNCODE fnet_main() {
   }
 
   // TODO: is this really ok?
+  return FNET_RETURNCODE_OK;
+}
+
+FNET_RETURNCODE fnet_shutdown() {
+  keepRunning = false;
   return FNET_RETURNCODE_OK;
 }
