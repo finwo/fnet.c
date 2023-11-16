@@ -464,6 +464,7 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
     rbuf->cap  = BUFSIZ;
     for ( i = 0 ; i < conn->nfds ; i++ ) {
       n = recv(conn->fds[i], rbuf->data, rbuf->cap, 0);
+      printf("Received %d bytes\n", n);
       if (n < 0) {
         if (errno == EAGAIN) continue;
         buf_clear(rbuf);
