@@ -460,8 +460,12 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
 
   if (conn->ext.status & FNET_STATUS_CONNECTED) {
     rbuf       = malloc(sizeof(struct buf));
+
+
+    // BORKED ON WINDOWS (512), DOESN'T GET THE WHOLE MESSAGE
     rbuf->data = malloc(BUFSIZ);
     rbuf->cap  = BUFSIZ;
+
     for ( i = 0 ; i < conn->nfds ; i++ ) {
       n = recv(conn->fds[i], rbuf->data, rbuf->cap, 0);
       printf("Received %d bytes\n", n);
