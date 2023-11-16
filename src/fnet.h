@@ -76,7 +76,6 @@ FNET_RETURNCODE fnet_write(const struct fnet_t *connection, struct buf *buf);
 FNET_RETURNCODE fnet_close(const struct fnet_t *connection);
 FNET_RETURNCODE fnet_free(struct fnet_t *connection);
 
-FNET_RETURNCODE fnet_tick();
 void            fnet_thread();
 FNET_RETURNCODE fnet_main();
 FNET_RETURNCODE fnet_shutdown();
