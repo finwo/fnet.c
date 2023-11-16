@@ -441,6 +441,9 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
   struct buf *rbuf = NULL;
   struct epoll_event *epev;
 
+  char *tmp_buf = NULL;
+  int   tmp_n   = 0;
+
   // Checking arguments are given
   if (!conn) {
     fprintf(stderr, "fnet_process: connection argument is required\n");
@@ -460,22 +463,28 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
 
   if (conn->ext.status & FNET_STATUS_CONNECTED) {
     rbuf       = malloc(sizeof(struct buf));
-
-
-    // BORKED ON WINDOWS (512), DOESN'T GET THE WHOLE MESSAGE
+    tmp_buf    = malloc(BUFSIZ);
     rbuf->data = malloc(BUFSIZ);
     rbuf->cap  = BUFSIZ;
 
     for ( i = 0 ; i < conn->nfds ; i++ ) {
-      n = recv(conn->fds[i], rbuf->data, rbuf->cap, 0);
-      printf("Received %d bytes\n", n);
-      if (n < 0) {
+
+      rbuf->len = 0;
+      do {
+        tmp_n = recv(conn->fds[i], tmp_buf, BUFSIZ, 0);
+        buf_append(rbuf, tmp_buf, tmp_n);
+      } while(tmp_n == BUFSIZ);
+
+      printf("Received %d bytes\n", rbuf->len);
+
+      if (rbuf->len < 0) {
         if (errno == EAGAIN) continue;
         buf_clear(rbuf);
         free(rbuf);
+        free(tmp_buf);
         return FNET_RETURNCODE_ERRNO;
       }
-      rbuf->len = n;
+
       if (rbuf->len == 0) {
         fnet_close((struct fnet_t *)conn);
         break;
@@ -492,6 +501,7 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
 
     buf_clear(rbuf);
     free(rbuf);
+    free(tmp_buf);
     return FNET_RETURNCODE_OK;
   }
 
