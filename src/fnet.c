@@ -723,6 +723,9 @@ FNET_RETURNCODE fnet_main() {
     // Do the actual processing
     if (epfd) {
       ev_count = epoll_wait(epfd, events, 8, tdiff);
+      if (ev_count) {
+        printf("New events: %d\n", ev_count);
+      }
       for( i = 0 ; i < ev_count ; i++ ) {
         ret = fnet_process((struct fnet_t *)events[i].data.ptr);
         if (ret) return ret;
