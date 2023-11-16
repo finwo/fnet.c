@@ -492,6 +492,7 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
   }
 
   if (conn->ext.status & FNET_STATUS_LISTENING) {
+    printf("Processing %d listening fds\n", conn->nfds);
     for ( i = 0 ; i < conn->nfds ; i++ ) {
       nfd = accept(conn->fds[i], (struct sockaddr *)&addr, &addrlen);
 
