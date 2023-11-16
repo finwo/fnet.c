@@ -1,3 +1,5 @@
 /lib/
 *.o
 /fnet_test
+compile_commands.json
+/.cache/

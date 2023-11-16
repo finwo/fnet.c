@@ -716,6 +716,8 @@ FNET_RETURNCODE fnet_main() {
 
   struct epoll_event events[8];
 
+  printf("Epoll enabled: %s\n", epfd ? "yes" : "no");
+
   while(runners) {
 
     // Do the actual processing
@@ -748,6 +750,8 @@ FNET_RETURNCODE fnet_main() {
 #endif
     }
   }
+
+  printf("fnet_main finished\n");
 
   return FNET_RETURNCODE_OK;
 }
