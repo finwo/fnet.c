@@ -475,7 +475,7 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
         buf_append(rbuf, tmp_buf, tmp_n);
       } while(tmp_n == BUFSIZ);
 
-      printf("Received %d bytes\n", rbuf->len);
+      /* printf("Received %d bytes\n", rbuf->len); */
 
       if (rbuf->len < 0) {
         if (errno == EAGAIN) continue;
@@ -506,7 +506,7 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
   }
 
   if (conn->ext.status & FNET_STATUS_LISTENING) {
-    printf("Processing %d listening fds\n", conn->nfds);
+    /* printf("Processing %d listening fds\n", conn->nfds); */
     for ( i = 0 ; i < conn->nfds ; i++ ) {
       nfd = accept(conn->fds[i], (struct sockaddr *)&addr, &addrlen);
 
@@ -732,16 +732,16 @@ FNET_RETURNCODE fnet_main() {
 
   struct epoll_event events[8];
 
-  printf("Epoll enabled: %s\n", epfd ? "yes" : "no");
+  /* printf("Epoll enabled: %s\n", epfd ? "yes" : "no"); */
 
   while(runners) {
 
     // Do the actual processing
     if (epfd) {
       ev_count = epoll_wait(epfd, events, 8, tdiff);
-      if (ev_count) {
-        printf("New events: %d\n", ev_count);
-      }
+      /* if (ev_count) { */
+      /*   printf("New events: %d\n", ev_count); */
+      /* } */
       for( i = 0 ; i < ev_count ; i++ ) {
         ret = fnet_process((struct fnet_t *)events[i].data.ptr);
         if (ret) return ret;
@@ -770,7 +770,7 @@ FNET_RETURNCODE fnet_main() {
     }
   }
 
-  printf("fnet_main finished\n");
+  /* printf("fnet_main finished\n"); */
 
   return FNET_RETURNCODE_OK;
 }
