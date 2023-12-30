@@ -5,7 +5,6 @@
 #include <string.h>
 
 #include <fcntl.h>
-#include <sys/errno.h>
 #include <sys/types.h>
 
 #if defined(_WIN32) || defined(_WIN64)
