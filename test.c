@@ -141,6 +141,6 @@ int main(int argc, const char *argv[]) {
     return 0;
   }
 
-  fprintf(stderr, "Mode not implemented\n");
+  fprintf(stderr, "Mode not implemented, use --listen or --connect\n");
   return 42;
 }

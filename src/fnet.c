@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include <fcntl.h>
+#include <sys/errno.h>
 #include <sys/types.h>
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -19,7 +20,7 @@
 #include <unistd.h>
 #endif
 
-#include "piscisaureus/wepoll.h"
+#include "finwo/poll.h"
 #include "tidwall/buf.h"
 
 #include "fnet.h"
@@ -33,16 +34,15 @@
 
 struct fnet_internal_t {
   struct fnet_t ext; // KEEP AT TOP, allows casting between fnet_internal_t* and fnet_t*
-  void               *prev;
-  void               *next;
-  FNET_SOCKET        *fds;
-  int                nfds;
-  struct epoll_event **epev;
-  FNET_FLAG          flags;
+  void          *prev;
+  void          *next;
+  FNET_SOCKET   *fds;
+  int           nfds;
+  FNET_FLAG     flags;
 };
 
 struct fnet_internal_t *connections = NULL;
-EPOLL_HANDLE           epfd         = 0;
+struct fpoll           *fpfd        = NULL;
 int                    runners      = 0;
 
 FNET_RETURNCODE setkeepalive(FNET_SOCKET fd) {
@@ -106,7 +106,7 @@ int64_t _fnet_now() {
 
 // CAUTION: assumes options have been vetted
 struct fnet_internal_t * _fnet_init(const struct fnet_options_t *options) {
-  if (!epfd) epfd = epoll_create1(0);
+  if (!fpfd) fpfd = fpoll_create();
 
   // 1-to-1 copy, don't touch the options
   struct fnet_internal_t *conn = malloc(sizeof(struct fnet_internal_t));
@@ -121,7 +121,6 @@ struct fnet_internal_t * _fnet_init(const struct fnet_options_t *options) {
   conn->ext.onClose   = options->onClose;
   conn->nfds          = 0;
   conn->fds           = NULL;
-  conn->epev          = NULL;
 
   // Aanndd add to the connection tracking list
   conn->next = connections;
@@ -198,15 +197,6 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
     return NULL;
   }
 
-  conn->epev = calloc(naddrs, sizeof(struct epoll_event *));
-  if (!conn->epev) {
-    fprintf(stderr, "%s\n", strerror(ENOMEM));
-    fnet_free((struct fnet_t *)conn);
-    freeaddrinfo(addrs);
-    return NULL;
-  }
-
-  struct epoll_event *epev;
   addrinfo = addrs;
   for (; addrinfo ; addrinfo = addrinfo->ai_next ) {
 
@@ -249,19 +239,8 @@ struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fne
     conn->fds[conn->nfds] = fd;
     conn->nfds++;
 
-    if (epfd) {
-      epev = malloc(sizeof(struct epoll_event));
-      if (!epev) continue;
-
-      epev->events   = EPOLLIN;
-      epev->data.ptr = conn;
-      if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, epev)) {
-        free(epev);
-        continue;
-      }
-
-      /* printf("Listen socket added to epfd\n"); */
-      conn->epev[conn->nfds - 1] = epev;
+    if (fpfd) {
+      fpoll_add(fpfd, FPOLL_IN | FPOLL_HUP, fd, conn);
     }
   }
 
@@ -328,10 +307,8 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
 
   // Count the addresses to listen on
   // For example, "localhost" turned to "127.0.0.1" and "::1"
-  int naddrs = 0;
   struct addrinfo *addrinfo = addrs;
   while(addrinfo) {
-    naddrs++;
     addrinfo = addrinfo->ai_next;
   }
 
@@ -343,17 +320,6 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
     return NULL;
   }
 
-  conn->epev = calloc(1, sizeof(struct epoll_event *));
-  if (!conn->epev) {
-    fprintf(stderr, "%s\n", strerror(ENOMEM));
-    fnet_free((struct fnet_t *)conn);
-    freeaddrinfo(addrs);
-    return NULL;
-  }
-
-  /* fprintf(stderr, "Addresses: %d\n", naddrs); */
-
-  struct epoll_event *epev;
   addrinfo = addrs;
   for (; addrinfo ; addrinfo = addrinfo->ai_next ) {
 
@@ -390,18 +356,8 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
     conn->fds[conn->nfds] = fd;
     conn->nfds++;
 
-    if (epfd) {
-      epev = malloc(sizeof(struct epoll_event));
-      if (!epev) break;
-
-      epev->events   = EPOLLIN;
-      epev->data.ptr = conn;
-      if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, epev)) {
-        free(epev);
-        break;
-      }
-
-      conn->epev[conn->nfds - 1] = epev;
+    if (fpfd) {
+      fpoll_add(fpfd, FPOLL_IN | FPOLL_HUP, fd, conn);
     }
 
     // Only need 1 connection
@@ -434,12 +390,11 @@ struct fnet_t * fnet_connect(const char *address, uint16_t port, const struct fn
 FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
   struct fnet_internal_t *conn = (struct fnet_internal_t *)connection;
   struct fnet_internal_t *nconn = NULL;
-  int i, n;
+  int i;
   FNET_SOCKET nfd;
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);
   struct buf *rbuf = NULL;
-  struct epoll_event *epev;
 
   char *tmp_buf = NULL;
   int   tmp_n   = 0;
@@ -451,6 +406,14 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
   }
 
   // No processing to be done here
+  /* printf("Status:"); */
+  /* printf((conn->ext.status & FNET_STATUS_INITIALIZING) ? " INITIALIZING" : ""); */
+  /* printf((conn->ext.status & FNET_STATUS_LISTENING   ) ? " LISTENING"    : ""); */
+  /* printf((conn->ext.status & FNET_STATUS_ERROR       ) ? " ERROR"        : ""); */
+  /* printf((conn->ext.status & FNET_STATUS_CONNECTING  ) ? " CONNECTING"   : ""); */
+  /* printf((conn->ext.status & FNET_STATUS_CONNECTED   ) ? " CONNECTED"    : ""); */
+  /* printf((conn->ext.status & FNET_STATUS_CLOSED      ) ? " CLOSED"       : ""); */
+  /* printf("\n"); */
   if (conn->ext.status & FNET_STATUS_INITIALIZING) return FNET_RETURNCODE_OK;
   if (conn->ext.status & FNET_STATUS_ERROR       ) return FNET_RETURNCODE_OK;
   if (conn->ext.status & FNET_STATUS_CLOSED      ) return FNET_RETURNCODE_OK;
@@ -509,13 +472,17 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
     /* printf("Processing %d listening fds\n", conn->nfds); */
     for ( i = 0 ; i < conn->nfds ; i++ ) {
       nfd = accept(conn->fds[i], (struct sockaddr *)&addr, &addrlen);
+      /* printf("New sock: %d\n", nfd); */
 
       if (nfd < 0) {
+        /* if (errno == EAGAIN     ) printf("Errno: EAGAIN(%d)\n", EAGAIN); */
+        /* if (errno == EWOULDBLOCK) printf("Errno: EWOULDBLOCK(%d)\n", EWOULDBLOCK); */
         if (
           (errno == EAGAIN) ||
           (errno == EWOULDBLOCK)
         ) {
           // Simply no connections to accept
+          /* printf("No new connections\n"); */
           continue;
         }
         // Indicate the errno is set
@@ -540,7 +507,6 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
       }));
 
       nconn->fds        = malloc(sizeof(FNET_SOCKET));
-      nconn->epev       = calloc(1, sizeof(struct epoll_event *));
       nconn->fds[0]     = nfd;
       nconn->nfds       = 1;
       nconn->ext.status = FNET_STATUS_CONNECTED | FNET_STATUS_ACCEPTED;
@@ -554,18 +520,8 @@ FNET_RETURNCODE fnet_process(const struct fnet_t *connection) {
         }));
       }
 
-      if (epfd) {
-        epev = malloc(sizeof(struct epoll_event));
-        if (!epev) continue;
-
-        epev->events   = EPOLLIN;
-        epev->data.ptr = nconn;
-        if (epoll_ctl(epfd, EPOLL_CTL_ADD, nfd, epev)) {
-          free(epev);
-          continue;
-        }
-
-        nconn->epev[0] = epev;
+      if (fpfd) {
+        fpoll_add(fpfd, FPOLL_IN | FPOLL_HUP, nfd, nconn);
       }
     }
 
@@ -627,6 +583,7 @@ FNET_RETURNCODE fnet_write(const struct fnet_t *connection, struct buf *buf) {
 }
 
 FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
+  /* printf("Internal fnet_close\n"); */
   struct fnet_internal_t *conn = (struct fnet_internal_t *)connection;
   int i;
 
@@ -638,7 +595,9 @@ FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
 
   if (conn->nfds) {
     for ( i = 0 ; i < conn->nfds ; i++ ) {
-      if ((epfd) && (conn->epev[i])) epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fds[i], conn->epev[i]);
+      if (fpfd) {
+        fpoll_del(fpfd, ~0, conn->fds[i]);
+      }
 #if defined(_WIN32) || defined(_WIN64)
       closesocket(conn->fds[i]);
 #else
@@ -647,9 +606,7 @@ FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
     }
     conn->nfds = 0;
     free(conn->fds);
-    free(conn->epev);
     conn->fds = NULL;
-    conn->epev = NULL;
   }
 
   conn->ext.status = FNET_STATUS_CLOSED;
@@ -685,7 +642,6 @@ FNET_RETURNCODE fnet_free(struct fnet_t *connection) {
   fnet_close((struct fnet_t *)conn);
 
   if (conn->fds) free(conn->fds);
-  if (conn->epev) free(conn->epev);
 
   free(conn);
 
@@ -730,20 +686,23 @@ FNET_RETURNCODE fnet_main() {
 
   runners++;
 
-  struct epoll_event events[8];
-
-  /* printf("Epoll enabled: %s\n", epfd ? "yes" : "no"); */
+  struct fpoll_ev events[8];
 
   while(runners) {
 
     // Do the actual processing
-    if (epfd) {
-      ev_count = epoll_wait(epfd, events, 8, tdiff);
+    if (fpfd) {
+      ev_count = fpoll_wait(fpfd, events, 8, tdiff);
       /* if (ev_count) { */
       /*   printf("New events: %d\n", ev_count); */
       /* } */
       for( i = 0 ; i < ev_count ; i++ ) {
-        ret = fnet_process((struct fnet_t *)events[i].data.ptr);
+        /* printf("EV:"); */
+        /* printf((events[i].ev & FPOLL_IN ) ? " IN" : ""); */
+        /* printf((events[i].ev & FPOLL_OUT) ? " OUT" : ""); */
+        /* printf((events[i].ev & FPOLL_HUP) ? " HUP" : ""); */
+        /* printf("\n"); */
+        ret = fnet_process((struct fnet_t *)events[i].udata);
         if (ret) return ret;
       }
     } else {
@@ -752,14 +711,14 @@ FNET_RETURNCODE fnet_main() {
 
     // Tick timing
     tdiff = ttime - _fnet_now();
-    if (epfd && (tdiff <= 0)) {
+    if (fpfd && (tdiff <= 0)) {
       ttime += 1000;
       tdiff += 1000;
       fnet_tick(0);
     }
 
     // Sleep if no epoll
-    if (!epfd) {
+    if (!fpfd) {
       /* printf("No poll, do tick\n"); */
       ttime += 1000;
 #if defined(_WIN32) || defined(_WIN64)
