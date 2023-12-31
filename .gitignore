@@ -3,3 +3,5 @@
 /fnet_test
 compile_commands.json
 /.cache/
+.DS_Store
+._.DS_Store
