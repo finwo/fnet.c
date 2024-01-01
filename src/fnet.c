@@ -27,6 +27,7 @@
 #if defined(_WIN32) || defined(_WIN64)
 #define FNET_SOCKET unsigned int
 #pragma comment(lib,"Ws2_32.lib")
+bool w32_initialized = false;
 #else
 #define FNET_SOCKET int
 #endif
@@ -133,6 +134,18 @@ struct fnet_internal_t * _fnet_init(const struct fnet_options_t *options) {
 
 struct fnet_t * fnet_listen(const char *address, uint16_t port, const struct fnet_options_t *options) {
   struct fnet_internal_t *conn;
+
+#if defined(_WIN32) || defined(_WIN64)
+  if (!w32_initialized) {
+    WSADATA wsaData;
+    int err = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (err) {
+      fprintf(stderr, "fnet_listen: WSAStartup\n");
+      return NULL;
+    }
+    w32_initialized = true;
+  }
+#endif
 
   // Checking arguments are given
   if (!address) {
@@ -738,5 +751,8 @@ FNET_RETURNCODE fnet_main() {
 FNET_RETURNCODE fnet_shutdown() {
   runners = 0;
   while(connections) fnet_free((struct fnet_t *)connections);
+#if defined(_WIN32) || defined(_WIN64)
+  WSACleanup();
+#endif
   return FNET_RETURNCODE_OK;
 }
