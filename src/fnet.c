@@ -584,6 +584,7 @@ FNET_RETURNCODE fnet_write(const struct fnet_t *connection, struct buf *buf) {
 FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
   /* printf("Internal fnet_close\n"); */
   struct fnet_internal_t *conn = (struct fnet_internal_t *)connection;
+  FNET_CALLBACK(cb) = NULL;
   int i;
 
   // Checking arguments are given
@@ -611,14 +612,15 @@ FNET_RETURNCODE fnet_close(const struct fnet_t *connection) {
   conn->ext.status = FNET_STATUS_CLOSED;
 
   if (conn->ext.onClose) {
-    conn->ext.onClose(&((struct fnet_ev){
+    cb = conn->ext.onClose;
+    conn->ext.onClose = NULL;
+
+    cb(&((struct fnet_ev){
       .connection = (struct fnet_t *)conn,
       .type       = FNET_EVENT_CLOSE,
       .buffer     = NULL,
       .udata      = conn->ext.udata,
     }));
-
-    conn->ext.onClose = NULL;
   }
 
   return FNET_RETURNCODE_OK;
