@@ -1,1 +1,1 @@
-SRC+=__DIRNAME/src/fnet.c
+SRC+={{module.dirname}}/src/fnet.c
